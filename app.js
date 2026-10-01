@@ -1,6 +1,14 @@
 /* =====================================================
-   DIGITALTACHO V1.4
-   GPS + START / STOP / RESET + WAKE LOCK
+   DIGITALTACHO V1.5
+   GPS
+   Schnelle Geschwindigkeitsanzeige
+   START / STOP / RESET
+   Wake Lock
+   Strecke
+   Fahrzeit
+   Durchschnitt
+   Maximum
+   Höhenmesser
    ===================================================== */
 /* =====================================================
    DOM
@@ -22,13 +30,70 @@ const startButton =
 const resetButton =
     document.getElementById("resetButton");
 /* =====================================================
+   HÖHENANZEIGE ERZEUGEN
+   ===================================================== */
+const statsContainer =
+    document.querySelector(".stats");
+let altitudeStat =
+    document.getElementById("altitudeStat");
+if (!altitudeStat && statsContainer) {
+    altitudeStat =
+        document.createElement("div");
+    altitudeStat.id =
+        "altitudeStat";
+    altitudeStat.className =
+        "stat";
+    altitudeStat.innerHTML = `
+        <span class="label">
+            Höhe
+        </span>
+        <span id="altitude" class="value">
+            — m
+        </span>
+    `;
+    statsContainer.appendChild(
+        altitudeStat
+    );
+}
+const altitudeElement =
+    document.getElementById("altitude");
+/* =====================================================
    EINSTELLUNGEN
    ===================================================== */
+/*
+   GPS-Genauigkeit:
+   Positionen mit schlechterer Genauigkeit
+   werden für die Fahrt verworfen.
+*/
 const MAX_GPS_ACCURACY = 100;
+/*
+   Sicherheitsgrenze gegen GPS-Ausreißer.
+*/
 const MAX_REASONABLE_SPEED = 350;
+/*
+   Maximal zulässiger Positionssprung
+   zwischen zwei GPS-Messungen.
+   0.5 km = 500 Meter
+*/
 const MAX_POSITION_JUMP = 0.5;
+/*
+   Kleinste Distanz für eine
+   relevante Positionsänderung.
+   0.003 km = 3 Meter
+*/
 const MIN_DISTANCE_STEP = 0.003;
-const SPEED_HISTORY_SIZE = 5;
+/*
+   Geschwindigkeit:
+   Je höher der Wert, desto schneller
+   folgt die Anzeige der aktuellen GPS-Geschwindigkeit.
+   0.70 = sehr direkte Reaktion.
+*/
+const SPEED_SMOOTHING = 0.70;
+/*
+   Höhe wird stärker geglättet,
+   da GPS-Höhenwerte deutlich stärker schwanken.
+*/
+const ALTITUDE_SMOOTHING = 0.20;
 /* =====================================================
    STATUS
    ===================================================== */
@@ -36,10 +101,17 @@ let maximumSpeed = 0;
 let totalDistance = 0;
 let lastPosition = null;
 let startTime = null;
-let speedHistory = [];
 let isDriving = false;
 let gpsFixReceived = false;
 let wakeLock = null;
+/*
+   Geglättete Geschwindigkeit.
+*/
+let displayedSpeed = 0;
+/*
+   Geglättete Höhe.
+*/
+let displayedAltitude = null;
 /* =====================================================
    GPS STARTEN
    ===================================================== */
@@ -54,7 +126,14 @@ function startGPS() {
         gpsError,
         {
             enableHighAccuracy: true,
-            maximumAge: 1000,
+            /*
+               Möglichst aktuelle GPS-Daten.
+            */
+            maximumAge: 500,
+            /*
+               GPS darf sich bis zu 20 Sekunden
+               Zeit für einen Fix nehmen.
+            */
             timeout: 20000
         }
     );
@@ -74,9 +153,9 @@ function gpsUpdate(position) {
         coords.longitude;
     const accuracy =
         coords.accuracy;
-    /* -------------------------------------------------
+    /* =================================================
        GPS STATUS
-       ------------------------------------------------- */
+       ================================================= */
     if (accuracy <= MAX_GPS_ACCURACY) {
         statusElement.textContent =
             `GPS AKTIV · ±${Math.round(accuracy)} m`;
@@ -84,69 +163,145 @@ function gpsUpdate(position) {
         statusElement.textContent =
             `GPS SCHWACH · ±${Math.round(accuracy)} m`;
     }
-    /* -------------------------------------------------
-       Nur während einer Fahrt aufzeichnen
-       ------------------------------------------------- */
+    /* =================================================
+       HÖHE
+       Die Höhe wird unabhängig von START
+       angezeigt.
+       ================================================= */
+    if (
+        coords.altitude !== null &&
+        Number.isFinite(coords.altitude)
+    ) {
+        const gpsAltitude =
+            coords.altitude;
+        if (displayedAltitude === null) {
+            /*
+               Erster Höhenwert.
+            */
+            displayedAltitude =
+                gpsAltitude;
+        } else {
+            /*
+               Starke Glättung gegen
+               typische GPS-Höhenschwankungen.
+            */
+            displayedAltitude =
+                displayedAltitude +
+                (
+                    gpsAltitude -
+                    displayedAltitude
+                ) *
+                ALTITUDE_SMOOTHING;
+        }
+        altitudeElement.textContent =
+            `${Math.round(displayedAltitude)} m`;
+    }
+    /* =================================================
+       SCHLECHTE GPS-GENAUIGKEIT
+       Höhenanzeige bleibt trotzdem erhalten.
+       Für die Fahrt wird der Messpunkt verworfen.
+       ================================================= */
     if (!isDriving) {
         return;
     }
-    /* -------------------------------------------------
-       Schlechte GPS-Genauigkeit ignorieren
-       ------------------------------------------------- */
-    if (accuracy > MAX_GPS_ACCURACY) {
+    if (
+        accuracy >
+        MAX_GPS_ACCURACY
+    ) {
         return;
     }
-    /* -------------------------------------------------
-       Geschwindigkeit
-       ------------------------------------------------- */
+    /* =================================================
+       ZEITPUNKT DER GPS-MESSUNG
+       ================================================= */
+    const currentTime =
+        position.timestamp;
+    /* =================================================
+       GESCHWINDIGKEIT
+       ================================================= */
     let currentSpeed = 0;
+    /*
+       Primär verwenden wir die von iOS
+       gemeldete GPS-Geschwindigkeit.
+    */
     if (
         coords.speed !== null &&
+        Number.isFinite(coords.speed) &&
         coords.speed >= 0
     ) {
         currentSpeed =
             coords.speed * 3.6;
+    } else if (lastPosition) {
+        /*
+           Falls iOS keine Geschwindigkeit liefert,
+           berechnen wir sie aus der Positionsänderung.
+        */
+        const distance =
+            calculateDistance(
+                lastPosition.latitude,
+                lastPosition.longitude,
+                latitude,
+                longitude
+            );
+        const timeDifference =
+            (
+                currentTime -
+                lastPosition.timestamp
+            ) / 3600000;
+        if (
+            timeDifference > 0 &&
+            distance <= MAX_POSITION_JUMP
+        ) {
+            currentSpeed =
+                distance /
+                timeDifference;
+        }
     }
+    /* =================================================
+       GESCHWINDIGKEITS-CHECK
+       ================================================= */
     if (
         currentSpeed >
         MAX_REASONABLE_SPEED
     ) {
         return;
     }
-    /* -------------------------------------------------
-       Geschwindigkeit glätten
-       ------------------------------------------------- */
-    speedHistory.push(currentSpeed);
+    /* =================================================
+       SCHNELLE GESCHWINDIGKEITSGLÄTTUNG
+       ================================================= */
+    displayedSpeed =
+        displayedSpeed +
+        (
+            currentSpeed -
+            displayedSpeed
+        ) *
+        SPEED_SMOOTHING;
+    /*
+       Kleine Werte auf 0 setzen,
+       damit der Tacho nicht bei 0.1–0.5 km/h
+       hängen bleibt.
+    */
     if (
-        speedHistory.length >
-        SPEED_HISTORY_SIZE
+        displayedSpeed < 0.5
     ) {
-        speedHistory.shift();
+        displayedSpeed = 0;
     }
-    const averageGPS =
-        speedHistory.reduce(
-            (sum, value) =>
-                sum + value,
-            0
-        ) /
-        speedHistory.length;
     speedElement.textContent =
-        averageGPS.toFixed(0);
-    /* -------------------------------------------------
+        displayedSpeed.toFixed(0);
+    /* =================================================
        MAXIMALGESCHWINDIGKEIT
-       ------------------------------------------------- */
+       ================================================= */
     if (
-        averageGPS >
+        displayedSpeed >
         maximumSpeed
     ) {
         maximumSpeed =
-            averageGPS;
+            displayedSpeed;
         maximumElement.textContent =
             `${maximumSpeed.toFixed(1)} km/h`;
     }
-    /* -------------------------------------------------
+    /* =================================================
        STRECKE
-       ------------------------------------------------- */
+       ================================================= */
     if (lastPosition) {
         const distance =
             calculateDistance(
@@ -155,6 +310,9 @@ function gpsUpdate(position) {
                 latitude,
                 longitude
             );
+        /*
+           Nur plausible Bewegungen übernehmen.
+        */
         if (
             distance >= MIN_DISTANCE_STEP &&
             distance <= MAX_POSITION_JUMP
@@ -165,13 +323,18 @@ function gpsUpdate(position) {
                 `${totalDistance.toFixed(2)} km`;
         }
     }
+    /* =================================================
+       LETZTE POSITION SPEICHERN
+       ================================================= */
     lastPosition = {
         latitude,
-        longitude
+        longitude,
+        timestamp:
+            currentTime
     };
-    /* -------------------------------------------------
-       DURCHSCHNITTSGESCHWINDIGKEIT
-       ------------------------------------------------- */
+    /* =================================================
+       DURCHSCHNITT
+       ================================================= */
     updateAverageSpeed();
 }
 /* =====================================================
@@ -243,7 +406,7 @@ function degreesToRadians(
         180;
 }
 /* =====================================================
-   DURCHSCHNITT
+   DURCHSCHNITTSGESCHWINDIGKEIT
    ===================================================== */
 function updateAverageSpeed() {
     if (
@@ -364,21 +527,25 @@ startButton.addEventListener(
     "click",
     async () => {
         if (!isDriving) {
-            /* START */
+            /* -----------------------------------------
+               START
+               ----------------------------------------- */
             isDriving = true;
             startTime =
                 Date.now();
             lastPosition = null;
-            speedHistory = [];
+            displayedSpeed = 0;
             statusElement.textContent =
                 "FAHRT LÄUFT";
             startButton.textContent =
                 "STOP";
             await requestWakeLock();
         } else {
-            /* STOP */
+            /* -----------------------------------------
+               STOP
+               ----------------------------------------- */
             isDriving = false;
-            speedHistory = [];
+            displayedSpeed = 0;
             speedElement.textContent =
                 "0";
             statusElement.textContent =
@@ -400,7 +567,8 @@ resetButton.addEventListener(
         totalDistance = 0;
         lastPosition = null;
         startTime = null;
-        speedHistory = [];
+        displayedSpeed = 0;
+        displayedAltitude = null;
         speedElement.textContent =
             "0";
         averageElement.textContent =
@@ -411,6 +579,8 @@ resetButton.addEventListener(
             "0.00 km";
         durationElement.textContent =
             "00:00:00";
+        altitudeElement.textContent =
+            "— m";
         statusElement.textContent =
             gpsFixReceived
                 ? "GPS AKTIV"
@@ -418,6 +588,21 @@ resetButton.addEventListener(
         startButton.textContent =
             "START";
         await releaseWakeLock();
+    }
+);
+/* =====================================================
+   WAKE LOCK NACH RÜCKKEHR ZU SAFARI
+   ===================================================== */
+document.addEventListener(
+    "visibilitychange",
+    async () => {
+        if (
+            document.visibilityState ===
+            "visible" &&
+            isDriving
+        ) {
+            await requestWakeLock();
+        }
     }
 );
 /* =====================================================
