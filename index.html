@@ -4,83 +4,92 @@
     <meta charset="UTF-8">
     <meta name="viewport"
           content="width=device-width,
-                   initial-scale=1.0">
-    <title>DigitalTacho GPS Test</title>
-    <style>
-        html,
-        body {
-            margin: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #status {
-            text-align: center;
-            font-size: 24px;
-        }
-        #speed {
-            margin-top: 20px;
-            font-size: 100px;
-            font-weight: 300;
-        }
-    </style>
+                   initial-scale=1.0,
+                   maximum-scale=1.0,
+                   user-scalable=no">
+    <meta name="apple-mobile-web-app-capable"
+          content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent">
+    <meta name="apple-mobile-web-app-title"
+          content="DigitalTacho">
+    <title>DigitalTacho</title>
+    <link rel="stylesheet"
+          href="style.css">
 </head>
 <body>
-<div id="status">
-    GPS wird gestartet …
-</div>
-<div id="speed">
-    0 km/h
-</div>
-<script>
-const status = document.getElementById("status");
-const speed = document.getElementById("speed");
-if (!navigator.geolocation) {
-    status.textContent =
-        "GPS wird nicht unterstützt";
-} else {
-    status.textContent =
-        "GPS wird angefordert …";
-    navigator.geolocation.watchPosition(
-        function(position) {
-            const gpsSpeed =
-                position.coords.speed;
-            if (
-                gpsSpeed !== null &&
-                Number.isFinite(gpsSpeed) &&
-                gpsSpeed >= 0
-            ) {
-                const kmh =
-                    Math.round(gpsSpeed * 3.6);
-                speed.textContent =
-                    kmh + " km/h";
-            }
-            status.textContent =
-                "GPS aktiv · Genauigkeit ±" +
-                Math.round(position.coords.accuracy) +
-                " m";
-        },
-        function(error) {
-            status.textContent =
-                "GPS-Fehler " +
-                error.code +
-                ": " +
-                error.message;
-        },
-        {
-            enableHighAccuracy: true,
-            maximumAge: 1000,
-            timeout: 15000
-        }
-    );
-}
-</script>
+<main class="tacho">
+    <!-- =========================
+         GESCHWINDIGKEIT
+         ========================= -->
+    <section class="speed-area">
+        <div id="speed">
+            0
+        </div>
+        <div class="unit">
+            km/h
+        </div>
+    </section>
+    <!-- =========================
+         FAHRDATEN
+         ========================= -->
+    <section class="stats">
+        <div class="stat">
+            <div
+                class="stat-value"
+                id="average">
+                0
+            </div>
+            <div class="stat-label">
+                Ø km/h
+            </div>
+        </div>
+        <div class="stat">
+            <div
+                class="stat-value"
+                id="maximum">
+                0
+            </div>
+            <div class="stat-label">
+                MAX km/h
+            </div>
+        </div>
+        <div class="stat">
+            <div
+                class="stat-value"
+                id="distance">
+                0.0
+            </div>
+            <div class="stat-label">
+                km
+            </div>
+        </div>
+        <div class="stat">
+            <div
+                class="stat-value"
+                id="duration">
+                00:00
+            </div>
+            <div class="stat-label">
+                Fahrzeit
+            </div>
+        </div>
+    </section>
+    <!-- =========================
+         RESET
+         ========================= -->
+    <button
+        id="resetButton"
+        type="button">
+        RESET
+    </button>
+    <!-- =========================
+         GPS STATUS
+         ========================= -->
+    <div id="status">
+        GPS wird gestartet …
+    </div>
+</main>
+<script src="app.js"></script>
 </body>
 </html>
