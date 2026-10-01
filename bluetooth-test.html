@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+    <meta name="theme-color" content="#000000">
+    <title>DigitalTacho Bluetooth-Test</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100%;
+            background: #000;
+            color: #fff;
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "SF Pro Display",
+                Arial,
+                sans-serif;
+        }
+        body {
+            padding: 30px;
+        }
+        h1 {
+            font-size: 28px;
+        }
+        button {
+            width: 100%;
+            max-width: 400px;
+            padding: 16px;
+            margin: 10px 0;
+            border: 0;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            background: #1b8f3a;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            background: #181818;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        #log {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 12px;
+            background: #101010;
+            color: #aaa;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bluetooth-Test</h1>
+    <button id="testButton">
+        BLUETOOTH TESTEN
+    </button>
+    <button id="scanButton">
+        BMW BLUETOOTH SUCHEN
+    </button>
+    <div id="status">
+        Bereit …
+    </div>
+    <div id="log"></div>
+    <script>
+        const statusElement =
+            document.getElementById("status");
+        const logElement =
+            document.getElementById("log");
+        const testButton =
+            document.getElementById("testButton");
+        const scanButton =
+            document.getElementById("scanButton");
+        function log(message) {
+            logElement.textContent +=
+                message + "\n";
+        }
+        testButton.addEventListener(
+            "click",
+            () => {
+                logElement.textContent = "";
+                log(
+                    "Browser: " +
+                    navigator.userAgent
+                );
+                log(
+                    "HTTPS: " +
+                    (
+                        location.protocol === "https:"
+                    )
+                );
+                log(
+                    "navigator.bluetooth: " +
+                    (
+                        "bluetooth" in navigator
+                    )
+                );
+                if (
+                    "bluetooth" in navigator
+                ) {
+                    statusElement.textContent =
+                        "Web Bluetooth wird vom Browser bereitgestellt.";
+                } else {
+                    statusElement.textContent =
+                        "Web Bluetooth wird von diesem Browser NICHT bereitgestellt.";
+                }
+            }
+        );
+        scanButton.addEventListener(
+            "click",
+            async () => {
+                if (
+                    !("bluetooth" in navigator)
+                ) {
+                    statusElement.textContent =
+                        "Bluetooth-API nicht verfügbar.";
+                    return;
+                }
+                try {
+                    statusElement.textContent =
+                        "Suche nach Bluetooth-Geräten …";
+                    log(
+                        "Starte Bluetooth-Suche …"
+                    );
+                    const device =
+                        await navigator.bluetooth.requestDevice({
+                            acceptAllDevices: true
+                        });
+                    log(
+                        "Gerät gefunden: " +
+                        (
+                            device.name ||
+                            "Unbekannt"
+                        )
+                    );
+                    log(
+                        "ID: " +
+                        device.id
+                    );
+                    statusElement.textContent =
+                        "Gerät gefunden:\n" +
+                        (
+                            device.name ||
+                            "Unbekannt"
+                        );
+                } catch (error) {
+                    log(
+                        "Fehler: " +
+                        error.name
+                    );
+                    log(
+                        error.message
+                    );
+                    statusElement.textContent =
+                        "Bluetooth-Suche beendet.\n\n" +
+                        error.name +
+                        "\n" +
+                        error.message;
+                }
+            }
+        );
+    </script>
+</body>
+</html>
