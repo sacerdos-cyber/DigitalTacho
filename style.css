@@ -1,13 +1,15 @@
+/* =====================================================
+   GRUNDLAYOUT
+   ===================================================== */
 * {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
 }
 html,
 body {
+    margin: 0;
+    padding: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden;
     background: #000;
     color: #fff;
     font-family:
@@ -15,208 +17,219 @@ body {
         BlinkMacSystemFont,
         "SF Pro Display",
         "Helvetica Neue",
+        Arial,
         sans-serif;
-}
-body {
-    min-height: 100vh;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
+    overflow: hidden;
 }
 /* =====================================================
    TACHO
    ===================================================== */
 .tacho {
-    width: 100vw;
-    height: 100vh;
-    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
+    align-items: center;
+    padding:
+        env(safe-area-inset-top)
+        env(safe-area-inset-right)
+        env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
 }
 /* =====================================================
    GESCHWINDIGKEIT
    ===================================================== */
-.speed-area {
+.speed-section {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    transform:
-        translateY(-5%);
+    flex: 1;
 }
-#speed {
-    font-size:
-        clamp(160px, 29vw, 390px);
-    font-weight: 300;
-    line-height: 0.75;
+.speed {
+    font-size: clamp(
+        120px,
+        25vw,
+        300px
+    );
+    line-height: 0.85;
+    font-weight: 700;
     letter-spacing: -0.06em;
     font-variant-numeric:
         tabular-nums;
-    transition:
-        color 0.25s ease;
-}
-.unit {
-    margin-top: 28px;
-    font-size:
-        clamp(24px, 3.2vw, 46px);
-    font-weight: 400;
-    letter-spacing: 0.2em;
-    opacity: 0.75;
-}
-/* =====================================================
-   FAHRDATEN
-   ===================================================== */
-.stats {
-    position: absolute;
-    left: 50%;
-    bottom: 65px;
-    transform:
-        translateX(-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap:
-        clamp(25px, 5vw, 80px);
-    white-space: nowrap;
-}
-.stat {
-    min-width: 75px;
     text-align: center;
 }
-.stat-value {
-    font-size:
-        clamp(20px, 3vw, 38px);
-    font-weight: 400;
-    font-variant-numeric:
-        tabular-nums;
-}
-.stat-label {
-    margin-top: 5px;
-    font-size:
-        clamp(10px, 1.2vw, 15px);
-    color: #666;
-    letter-spacing: 0.05em;
+.unit {
+    margin-top: 10px;
+    font-size: clamp(
+        20px,
+        3vw,
+        32px
+    );
+    font-weight: 500;
+    opacity: 0.7;
 }
 /* =====================================================
-   GPS STATUS
+   STATUS
    ===================================================== */
-#status {
-    position: absolute;
-    bottom: 14px;
-    left: 50%;
-    transform:
-        translateX(-50%);
-    color: #555;
+.status {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #888;
+    text-align: center;
+    min-height: 20px;
+}
+/* =====================================================
+   STATISTIK
+   ===================================================== */
+.stats {
+    width: min(
+        900px,
+        92vw
+    );
+    display: grid;
+    grid-template-columns:
+        repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+}
+.stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(
+        255,
+        255,
+        255,
+        0.06
+    );
+}
+.label {
     font-size: 12px;
+    color: #888;
+    margin-bottom: 5px;
+    text-align: center;
+}
+.value {
+    font-size: clamp(
+        16px,
+        2vw,
+        24px
+    );
+    font-weight: 600;
+    font-variant-numeric:
+        tabular-nums;
     white-space: nowrap;
 }
 /* =====================================================
-   STEUERUNG
+   BUTTONS
    ===================================================== */
 .controls {
-    position: absolute;
-    top: 20px;
-    right: 25px;
     display: flex;
-    gap: 10px;
+    gap: 15px;
+    margin-bottom: 18px;
 }
 .controls button {
-    min-width: 70px;
+    border: none;
+    border-radius: 12px;
     padding:
-        10px 18px;
-    border:
-        1px solid #333;
-    border-radius: 10px;
-    background: #111;
-    color: #777;
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    -webkit-appearance: none;
-    appearance: none;
+        12px
+        30px;
+    min-width: 130px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
     -webkit-tap-highlight-color:
         transparent;
 }
-.controls button:active {
-    background: #222;
-    color: #fff;
-    border-color: #555;
+.start-button {
+    background: #1b8f3a;
 }
-.diagnostics {
-
-    position: absolute;
-
-    top: 20px;
-
-    left: 25px;
-
-    color: #555;
-
-    font-size: 11px;
-
-    line-height: 1.5;
-
-    font-variant-numeric:
-        tabular-nums;
+.start-button:active {
+    background: #146b2b;
+}
+.reset-button {
+    background: #333;
+}
+.reset-button:active {
+    background: #222;
 }
 /* =====================================================
    HOCHFORMAT
    ===================================================== */
+.portrait-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #000;
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 24px;
+    padding: 30px;
+}
+/* =====================================================
+   IPHONE HOCHFORMAT
+   ===================================================== */
 @media (orientation: portrait) {
-    .tacho::before {
-        content:
-            "Bitte iPhone quer halten";
-        position: absolute;
-        inset: 0;
-        z-index: 1000;
+    .portrait-warning {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #000;
-        color: #fff;
-        font-size: 26px;
-        text-align: center;
+    }
+    .tacho {
+        display: none;
     }
 }
 /* =====================================================
-   KLEINE QUERFORMAT-GERÄTE
+   KLEINE QUERFORMAT-DISPLAYS
    ===================================================== */
 @media (
     orientation: landscape
-) and (
-    max-height: 450px
-) {
-    #speed {
-        font-size:
-            clamp(120px, 28vh, 230px);
+) and (max-height: 500px) {
+    .speed {
+        font-size: clamp(
+            90px,
+            22vw,
+            190px
+        );
     }
     .unit {
-        margin-top: 15px;
-        font-size:
-            clamp(18px, 5vh, 28px);
+        margin-top: 5px;
+        font-size: 18px;
+    }
+    .status {
+        margin-top: 5px;
+        font-size: 12px;
     }
     .stats {
-        bottom: 42px;
-        gap: 25px;
+        margin-bottom: 8px;
+        gap: 8px;
     }
-    .stat-value {
-        font-size: 20px;
+    .stat {
+        padding: 6px;
     }
-    .stat-label {
+    .label {
         font-size: 10px;
     }
-    #status {
-        bottom: 8px;
-        font-size: 10px;
+    .value {
+        font-size: 15px;
     }
     .controls {
-        top: 10px;
-        right: 15px;
+        margin-bottom: 8px;
+        gap: 10px;
     }
     .controls button {
         padding:
-            7px 12px;
-        font-size: 10px;
+            8px
+            24px;
+        min-width: 110px;
+        font-size: 14px;
     }
 }
