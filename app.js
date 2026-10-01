@@ -629,6 +629,7 @@ startButton.addEventListener(
                 "FAHRT LÄUFT";
             startButton.textContent =
                 "STOP";
+            startButton.classList.add("stop-button");
             await requestWakeLock();
         } else {
             /* =========================================
@@ -642,6 +643,7 @@ startButton.addEventListener(
                 "FAHRT BEENDET";
             startButton.textContent =
                 "START";
+            startButton.classList.remove("stop-button");
             await releaseWakeLock();
         }
     }
