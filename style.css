@@ -143,6 +143,23 @@ body {
     color: #fff;
     border-color: #555;
 }
+.diagnostics {
+
+    position: absolute;
+
+    top: 20px;
+
+    left: 25px;
+
+    color: #555;
+
+    font-size: 11px;
+
+    line-height: 1.5;
+
+    font-variant-numeric:
+        tabular-nums;
+}
 /* =====================================================
    HOCHFORMAT
    ===================================================== */
