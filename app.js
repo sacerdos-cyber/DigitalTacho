@@ -17,9 +17,8 @@ const resetButton =
 /* =====================================================
    EINSTELLUNGEN
    ===================================================== */
-const MIN_MOVEMENT_SPEED = 1.5;
+const MAX_GPS_ACCURACY = 100;
 const MAX_REASONABLE_SPEED = 350;
-const MAX_GPS_ACCURACY = 50;
 const MAX_POSITION_JUMP = 0.5;
 const MIN_DISTANCE_STEP = 0.003;
 const SPEED_HISTORY_SIZE = 5;
@@ -32,112 +31,43 @@ let lastPosition = null;
 let startTime = null;
 let speedHistory = [];
 let isDriving = false;
-/* =====================================================
-   WAKE LOCK
-   ===================================================== */
+let gpsFixReceived = false;
 let wakeLock = null;
-/*
- * Wake Lock anfordern
- */
-async function requestWakeLock() {
-    if (
-        !("wakeLock" in navigator)
-    ) {
-        console.log(
-            "Wake Lock wird nicht unterstützt."
-        );
-        return;
-    }
-    try {
-        wakeLock =
-            await navigator.wakeLock.request(
-                "screen"
-            );
-        console.log(
-            "Wake Lock aktiviert."
-        );
-        wakeLock.addEventListener(
-            "release",
-            () => {
-                console.log(
-                    "Wake Lock freigegeben."
-                );
-                wakeLock = null;
-            }
-        );
-    } catch (error) {
-        console.log(
-            "Wake Lock konnte nicht aktiviert werden:",
-            error
-        );
-    }
+/* =====================================================
+   GPS STATUS
+   ===================================================== */
+function setStatus(message) {
+    statusDisplay.textContent =
+        message;
 }
-/*
- * Wake Lock freigeben
- */
-async function releaseWakeLock() {
-    if (
-        wakeLock !== null
-    ) {
-        try {
-            await wakeLock.release();
-        } catch (error) {
-            console.log(
-                "Fehler beim Freigeben des Wake Locks:",
-                error
-            );
-        }
-        wakeLock = null;
-    }
-}
-/*
- * Wake Lock erneut aktivieren,
- * wenn Safari wieder aktiv wird.
- */
-document.addEventListener(
-    "visibilitychange",
-    async () => {
-        if (
-            document.visibilityState ===
-            "visible" &&
-            isDriving
-        ) {
-            await requestWakeLock();
-        }
-    }
-);
 /* =====================================================
    GPS STARTEN
    ===================================================== */
 function startGPS() {
-    if (
-        !navigator.geolocation
-    ) {
-        statusDisplay.textContent =
-            "GPS wird nicht unterstützt";
+    if (!navigator.geolocation) {
+        setStatus(
+            "GPS: NICHT UNTERSTÜTZT"
+        );
         return;
     }
-    statusDisplay.textContent =
-        "GPS wird gestartet …";
+    setStatus(
+        "GPS: WARTE AUF POSITION …"
+    );
     navigator.geolocation.watchPosition(
         gpsUpdate,
         gpsError,
         {
-            enableHighAccuracy:
-                true,
-            maximumAge:
-                1000,
-            timeout:
-                15000
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 20000
         }
     );
 }
 /* =====================================================
    GPS UPDATE
    ===================================================== */
-function gpsUpdate(
-    position
-) {
+function gpsUpdate(position) {
+    gpsFixReceived = true;
     const coords =
         position.coords;
     const latitude =
@@ -146,74 +76,57 @@ function gpsUpdate(
         coords.longitude;
     const accuracy =
         coords.accuracy;
+    let speedKmh = 0;
+    if (
+        coords.speed !== null &&
+        Number.isFinite(coords.speed) &&
+        coords.speed >= 0
+    ) {
+        speedKmh =
+            coords.speed * 3.6;
+    }
+    if (
+        speedKmh < 1.5
+    ) {
+        speedKmh = 0;
+    }
+    if (
+        speedKmh >
+        MAX_REASONABLE_SPEED
+    ) {
+        speedKmh = 0;
+    }
     /* =================================================
-       GPS STATUS
+       STATUS
        ================================================= */
     if (
-        !Number.isFinite(
-            accuracy
-        ) ||
-        accuracy >
-            MAX_GPS_ACCURACY
+        accuracy <= MAX_GPS_ACCURACY
     ) {
-        statusDisplay.textContent =
-            `GPS schwach · ±${Math.round(accuracy)} m`;
+        setStatus(
+            `GPS AKTIV · ±${Math.round(accuracy)} m`
+        );
     } else {
-        statusDisplay.textContent =
-            `GPS aktiv · ±${Math.round(accuracy)} m`;
-    }
-    /* =================================================
-       KEINE FAHRT
-       ================================================= */
-    if (
-        !isDriving
-    ) {
-        return;
-    }
-    /* =================================================
-       GPS GENAUIGKEIT
-       ================================================= */
-    if (
-        Number.isFinite(
-            accuracy
-        ) &&
-        accuracy >
-            MAX_GPS_ACCURACY
-    ) {
-        return;
+        setStatus(
+            `GPS SCHWACH · ±${Math.round(accuracy)} m`
+        );
     }
     /* =================================================
        GESCHWINDIGKEIT
        ================================================= */
     if (
-        coords.speed !== null &&
-        Number.isFinite(
-            coords.speed
-        ) &&
-        coords.speed >= 0
+        isDriving
     ) {
-        let speedKmh =
-            coords.speed * 3.6;
-        if (
-            speedKmh <=
-            MAX_REASONABLE_SPEED
-        ) {
-            if (
-                speedKmh <
-                MIN_MOVEMENT_SPEED
-            ) {
-                speedKmh = 0;
-            }
-            addSpeedSample(
-                speedKmh
-            );
-        }
+        addSpeedSample(
+            speedKmh
+        );
     }
     /* =================================================
        STRECKE
        ================================================= */
     if (
-        lastPosition !== null
+        isDriving &&
+        lastPosition !== null &&
+        accuracy <= MAX_GPS_ACCURACY
     ) {
         const distance =
             calculateDistance(
@@ -222,14 +135,9 @@ function gpsUpdate(
                 latitude,
                 longitude
             );
-        /*
-         * GPS-Sprünge ignorieren.
-         */
         if (
-            distance >=
-                MIN_DISTANCE_STEP &&
-            distance <=
-                MAX_POSITION_JUMP
+            distance >= MIN_DISTANCE_STEP &&
+            distance <= MAX_POSITION_JUMP
         ) {
             totalDistance +=
                 distance;
@@ -243,7 +151,52 @@ function gpsUpdate(
         longitude:
             longitude
     };
+    /* =================================================
+       DURCHSCHNITT
+       ================================================= */
     updateAverage();
+    /* =================================================
+       DIAGNOSE
+       ================================================= */
+    updateDiagnostics({
+        latitude,
+        longitude,
+        accuracy,
+        speedKmh
+    });
+}
+/* =====================================================
+   GPS FEHLER
+   ===================================================== */
+function gpsError(error) {
+    gpsFixReceived = false;
+    switch (
+        error.code
+    ) {
+        case 1:
+            setStatus(
+                "GPS FEHLER 1 · ZUGRIFF VERWEIGERT"
+            );
+            break;
+        case 2:
+            setStatus(
+                "GPS FEHLER 2 · POSITION NICHT VERFÜGBAR"
+            );
+            break;
+        case 3:
+            setStatus(
+                "GPS FEHLER 3 · TIMEOUT"
+            );
+            break;
+        default:
+            setStatus(
+                "GPS FEHLER"
+            );
+    }
+    console.log(
+        "GPS Fehler:",
+        error
+    );
 }
 /* =====================================================
    GESCHWINDIGKEIT GLÄTTEN
@@ -278,9 +231,6 @@ function addSpeedSample(
         );
     speedDisplay.textContent =
         smoothSpeed;
-    /* =================================================
-       MAXIMUM
-       ================================================= */
     if (
         smoothSpeed >
         maximumSpeed
@@ -308,8 +258,7 @@ function updateAverage() {
         (
             Date.now() -
             startTime
-        ) /
-        3600000;
+        ) / 3600000;
     if (
         elapsedHours <= 0
     ) {
@@ -345,10 +294,7 @@ function calculateDistance(
     const a =
         Math.sin(
             dLat / 2
-        ) *
-        Math.sin(
-            dLat / 2
-        )
+        ) ** 2
         +
         Math.cos(
             toRadians(lat1)
@@ -360,10 +306,7 @@ function calculateDistance(
         *
         Math.sin(
             dLon / 2
-        ) *
-        Math.sin(
-            dLon / 2
-        );
+        ) ** 2;
     const c =
         2 *
         Math.atan2(
@@ -405,19 +348,16 @@ function updateDuration() {
         );
     const hours =
         Math.floor(
-            totalSeconds /
-            3600
+            totalSeconds / 3600
         );
     const minutes =
         Math.floor(
             (
-                totalSeconds %
-                3600
+                totalSeconds % 3600
             ) / 60
         );
     const seconds =
-        totalSeconds %
-        60;
+        totalSeconds % 60;
     if (
         hours > 0
     ) {
@@ -443,17 +383,81 @@ function pad(
     );
 }
 /* =====================================================
+   WAKE LOCK
+   ===================================================== */
+async function requestWakeLock() {
+    if (
+        !("wakeLock" in navigator)
+    ) {
+        updateWakeStatus(
+            "NICHT UNTERSTÜTZT"
+        );
+        return;
+    }
+    try {
+        wakeLock =
+            await navigator.wakeLock.request(
+                "screen"
+            );
+        updateWakeStatus(
+            "AKTIV"
+        );
+        wakeLock.addEventListener(
+            "release",
+            () => {
+                wakeLock = null;
+                updateWakeStatus(
+                    "FREIGEGEBEN"
+                );
+            }
+        );
+    } catch (error) {
+        updateWakeStatus(
+            "FEHLER"
+        );
+        console.log(
+            "Wake Lock Fehler:",
+            error
+        );
+    }
+}
+async function releaseWakeLock() {
+    if (
+        wakeLock !== null
+    ) {
+        try {
+            await wakeLock.release();
+        } catch (error) {
+            console.log(
+                error
+            );
+        }
+        wakeLock = null;
+    }
+    updateWakeStatus(
+        "AUS"
+    );
+}
+function updateWakeStatus(
+    status
+) {
+    const element =
+        document.getElementById(
+            "wakeStatus"
+        );
+    if (element) {
+        element.textContent =
+            `Wake Lock: ${status}`;
+    }
+}
+/* =====================================================
    START / STOP
    ===================================================== */
 async function toggleDriving() {
     if (
         !isDriving
     ) {
-        /* =============================
-           START
-           ============================= */
-        isDriving =
-            true;
+        isDriving = true;
         startTime =
             Date.now();
         lastPosition =
@@ -462,29 +466,20 @@ async function toggleDriving() {
             [];
         startButton.textContent =
             "STOP";
-        statusDisplay.textContent =
-            "Fahrt läuft";
-        /*
-         * Display wach halten
-         */
+        setStatus(
+            "FAHRT LÄUFT"
+        );
         await requestWakeLock();
     } else {
-        /* =============================
-           STOP
-           ============================= */
-        isDriving =
-            false;
-        speedHistory =
-            [];
+        isDriving = false;
+        speedHistory = [];
         speedDisplay.textContent =
             "0";
         startButton.textContent =
             "START";
-        statusDisplay.textContent =
-            "Fahrt beendet";
-        /*
-         * Display wieder freigeben
-         */
+        setStatus(
+            "FAHRT BEENDET"
+        );
         await releaseWakeLock();
     }
 }
@@ -496,18 +491,12 @@ startButton.addEventListener(
    RESET
    ===================================================== */
 async function resetTacho() {
-    isDriving =
-        false;
-    maximumSpeed =
-        0;
-    totalDistance =
-        0;
-    lastPosition =
-        null;
-    startTime =
-        null;
-    speedHistory =
-        [];
+    isDriving = false;
+    maximumSpeed = 0;
+    totalDistance = 0;
+    lastPosition = null;
+    startTime = null;
+    speedHistory = [];
     speedDisplay.textContent =
         "0";
     averageDisplay.textContent =
@@ -520,14 +509,64 @@ async function resetTacho() {
         "00:00";
     startButton.textContent =
         "START";
-    statusDisplay.textContent =
-        "GPS bereit";
+    setStatus(
+        "GPS ZURÜCKGESETZT"
+    );
     await releaseWakeLock();
 }
 resetButton.addEventListener(
     "click",
     resetTacho
 );
+/* =====================================================
+   DIAGNOSE
+   ===================================================== */
+function updateDiagnostics(data) {
+    const gpsStatus =
+        document.getElementById(
+            "gpsStatus"
+        );
+    const gpsAccuracy =
+        document.getElementById(
+            "gpsAccuracy"
+        );
+    const gpsLatitude =
+        document.getElementById(
+            "gpsLatitude"
+        );
+    const gpsLongitude =
+        document.getElementById(
+            "gpsLongitude"
+        );
+    const gpsSpeed =
+        document.getElementById(
+            "gpsSpeed"
+        );
+    if (gpsStatus) {
+        gpsStatus.textContent =
+            gpsFixReceived
+                ? "GPS: FIX"
+                : "GPS: KEIN FIX";
+    }
+    if (gpsAccuracy) {
+        gpsAccuracy.textContent =
+            `Genauigkeit: ±${Math.round(
+                data.accuracy
+            )} m`;
+    }
+    if (gpsLatitude) {
+        gpsLatitude.textContent =
+            `Lat: ${data.latitude.toFixed(6)}`;
+    }
+    if (gpsLongitude) {
+        gpsLongitude.textContent =
+            `Lon: ${data.longitude.toFixed(6)}`;
+    }
+    if (gpsSpeed) {
+        gpsSpeed.textContent =
+            `GPS-Speed: ${data.speedKmh.toFixed(1)} km/h`;
+    }
+}
 /* =====================================================
    TIMER
    ===================================================== */
@@ -536,6 +575,6 @@ setInterval(
     1000
 );
 /* =====================================================
-   GPS STARTEN
+   GPS START
    ===================================================== */
 startGPS();
