@@ -10,18 +10,18 @@ const durationDisplay =
     document.getElementById("duration");
 const statusDisplay =
     document.getElementById("status");
-const resetButton =
-    document.getElementById("resetButton");
 const startButton =
     document.getElementById("startButton");
+const resetButton =
+    document.getElementById("resetButton");
 /* =====================================================
    EINSTELLUNGEN
    ===================================================== */
-const MIN_MOVEMENT_SPEED = 1.5;   // km/h
-const MAX_REASONABLE_SPEED = 350; // km/h
-const MAX_GPS_ACCURACY = 50;      // Meter
-const MAX_POSITION_JUMP = 0.5;    // km
-const MIN_DISTANCE_STEP = 0.003;  // 3 Meter
+const MIN_MOVEMENT_SPEED = 1.5;
+const MAX_REASONABLE_SPEED = 350;
+const MAX_GPS_ACCURACY = 50;
+const MAX_POSITION_JUMP = 0.5;
+const MIN_DISTANCE_STEP = 0.003;
 const SPEED_HISTORY_SIZE = 5;
 /* =====================================================
    FAHRDATEN
@@ -59,13 +59,6 @@ function startGPS() {
 function gpsUpdate(position) {
     const coords =
         position.coords;
-    if (!isDriving) {
-
-    statusDisplay.textContent =
-        `GPS bereit · ±${Math.round(coords.accuracy)} m`;
-
-    return;
-    }
     const latitude =
         coords.latitude;
     const longitude =
@@ -73,7 +66,7 @@ function gpsUpdate(position) {
     const accuracy =
         coords.accuracy;
     /* =================================================
-       GPS-GENAUIGKEIT
+       GPS-STATUS
        ================================================= */
     if (
         !Number.isFinite(accuracy) ||
@@ -86,11 +79,19 @@ function gpsUpdate(position) {
             `GPS aktiv · ±${Math.round(accuracy)} m`;
     }
     /* =================================================
-       FAHRT STARTEN
+       WENN KEINE FAHRT LÄUFT
        ================================================= */
-    if (startTime === null) {
-        startTime =
-            Date.now();
+    if (!isDriving) {
+        return;
+    }
+    /* =================================================
+       GÜLTIGE GPS-GENAUIGKEIT PRÜFEN
+       ================================================= */
+    if (
+        Number.isFinite(accuracy) &&
+        accuracy > MAX_GPS_ACCURACY
+    ) {
+        return;
     }
     /* =================================================
        GESCHWINDIGKEIT
@@ -102,17 +103,10 @@ function gpsUpdate(position) {
     ) {
         let speedKmh =
             coords.speed * 3.6;
-        /*
-         * Unplausible Werte ignorieren.
-         */
         if (
             speedKmh <=
             MAX_REASONABLE_SPEED
         ) {
-            /*
-             * Unter 1,5 km/h
-             * behandeln wir als Stillstand.
-             */
             if (
                 speedKmh <
                 MIN_MOVEMENT_SPEED
@@ -136,7 +130,7 @@ function gpsUpdate(position) {
                 longitude
             );
         /*
-         * GPS-Sprung prüfen.
+         * GPS-Sprünge ignorieren.
          */
         if (
             distance >= MIN_DISTANCE_STEP &&
@@ -168,20 +162,12 @@ function addSpeedSample(
     speedHistory.push(
         speed
     );
-    /*
-     * Nur die letzten
-     * Werte behalten.
-     */
     if (
         speedHistory.length >
         SPEED_HISTORY_SIZE
     ) {
         speedHistory.shift();
     }
-    /*
-     * Durchschnitt der letzten
-     * GPS-Werte.
-     */
     const sum =
         speedHistory.reduce(
             (total, value) =>
@@ -215,6 +201,7 @@ function addSpeedSample(
    ===================================================== */
 function updateAverage() {
     if (
+        !isDriving ||
         startTime === null ||
         totalDistance <= 0
     ) {
@@ -299,6 +286,7 @@ function toRadians(
    ===================================================== */
 function updateDuration() {
     if (
+        !isDriving ||
         startTime === null
     ) {
         return;
@@ -337,10 +325,6 @@ function updateDuration() {
             `${pad(minutes)}:` +
             `${pad(seconds)}`;
     }
-    /*
-     * Durchschnitt regelmäßig
-     * aktualisieren.
-     */
     updateAverage();
 }
 function pad(
@@ -354,40 +338,52 @@ function pad(
     );
 }
 /* =====================================================
-   GPS FEHLER
+   START / STOP
    ===================================================== */
-function gpsError(
-    error
-) {
-    switch (
-        error.code
-    ) {
-        case 1:
-            statusDisplay.textContent =
-                "Standortzugriff verweigert";
-            break;
-        case 2:
-            statusDisplay.textContent =
-                "GPS nicht verfügbar";
-            break;
-        case 3:
-            statusDisplay.textContent =
-                "GPS Timeout";
-            break;
-        default:
-            statusDisplay.textContent =
-                "GPS Fehler";
+function toggleDriving() {
+    if (!isDriving) {
+        /* =============================
+           START
+           ============================= */
+        isDriving = true;
+        startTime =
+            Date.now();
+        lastPosition =
+            null;
+        speedHistory =
+            [];
+        startButton.textContent =
+            "STOP";
+        statusDisplay.textContent =
+            "Fahrt läuft";
+    } else {
+        /* =============================
+           STOP
+           ============================= */
+        isDriving = false;
+        speedHistory =
+            [];
+        speedDisplay.textContent =
+            "0";
+        startButton.textContent =
+            "START";
+        statusDisplay.textContent =
+            "Fahrt beendet";
     }
 }
+startButton.addEventListener(
+    "click",
+    toggleDriving
+);
 /* =====================================================
    RESET
    ===================================================== */
 function resetTacho() {
+    isDriving = false;
     maximumSpeed = 0;
     totalDistance = 0;
     lastPosition = null;
-    startTime =
-        Date.now();
+    startTime = null;
     speedHistory = [];
     speedDisplay.textContent =
         "0";
@@ -399,8 +395,10 @@ function resetTacho() {
         "0.0";
     durationDisplay.textContent =
         "00:00";
+    startButton.textContent =
+        "START";
     statusDisplay.textContent =
-        "GPS wird gestartet …";
+        "GPS bereit";
 }
 resetButton.addEventListener(
     "click",
