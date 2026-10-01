@@ -23,9 +23,9 @@ body {
     -webkit-user-select: none;
     -webkit-touch-callout: none;
 }
-/* =========================
+/* =====================================================
    TACHO
-   ========================= */
+   ===================================================== */
 .tacho {
     width: 100vw;
     height: 100vh;
@@ -34,9 +34,9 @@ body {
     align-items: center;
     justify-content: center;
 }
-/* =========================
+/* =====================================================
    GESCHWINDIGKEIT
-   ========================= */
+   ===================================================== */
 .speed-area {
     display: flex;
     flex-direction: column;
@@ -64,9 +64,9 @@ body {
     letter-spacing: 0.2em;
     opacity: 0.75;
 }
-/* =========================
+/* =====================================================
    FAHRDATEN
-   ========================= */
+   ===================================================== */
 .stats {
     position: absolute;
     left: 50%;
@@ -98,9 +98,9 @@ body {
     color: #666;
     letter-spacing: 0.05em;
 }
-/* =========================
+/* =====================================================
    GPS STATUS
-   ========================= */
+   ===================================================== */
 #status {
     position: absolute;
     bottom: 14px;
@@ -111,31 +111,41 @@ body {
     font-size: 12px;
     white-space: nowrap;
 }
-/* =========================
-   RESET BUTTON
-   ========================= */
-#resetButton {
+/* =====================================================
+   STEUERUNG
+   ===================================================== */
+.controls {
     position: absolute;
     top: 20px;
     right: 25px;
+    display: flex;
+    gap: 10px;
+}
+.controls button {
+    min-width: 70px;
     padding:
         10px 18px;
-    border: 1px solid #333;
+    border:
+        1px solid #333;
     border-radius: 10px;
     background: #111;
     color: #777;
     font-size: 12px;
+    font-weight: 500;
     letter-spacing: 0.1em;
     -webkit-appearance: none;
     appearance: none;
+    -webkit-tap-highlight-color:
+        transparent;
 }
-#resetButton:active {
+.controls button:active {
     background: #222;
     color: #fff;
+    border-color: #555;
 }
-/* =========================
+/* =====================================================
    HOCHFORMAT
-   ========================= */
+   ===================================================== */
 @media (orientation: portrait) {
     .tacho::before {
         content:
@@ -150,5 +160,46 @@ body {
         color: #fff;
         font-size: 26px;
         text-align: center;
+    }
+}
+/* =====================================================
+   KLEINE QUERFORMAT-GERÄTE
+   ===================================================== */
+@media (
+    orientation: landscape
+) and (
+    max-height: 450px
+) {
+    #speed {
+        font-size:
+            clamp(120px, 28vh, 230px);
+    }
+    .unit {
+        margin-top: 15px;
+        font-size:
+            clamp(18px, 5vh, 28px);
+    }
+    .stats {
+        bottom: 42px;
+        gap: 25px;
+    }
+    .stat-value {
+        font-size: 20px;
+    }
+    .stat-label {
+        font-size: 10px;
+    }
+    #status {
+        bottom: 8px;
+        font-size: 10px;
+    }
+    .controls {
+        top: 10px;
+        right: 15px;
+    }
+    .controls button {
+        padding:
+            7px 12px;
+        font-size: 10px;
     }
 }
