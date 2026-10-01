@@ -2,127 +2,95 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width,
-                   initial-scale=1.0,
-                   maximum-scale=1.0,
-                   user-scalable=no">
-    <meta name="apple-mobile-web-app-capable"
-          content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style"
-          content="black-translucent">
-    <meta name="apple-mobile-web-app-title"
-          content="DigitalTacho">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+    <meta
+        name="apple-mobile-web-app-capable"
+        content="yes"
+    >
+    <meta
+        name="apple-mobile-web-app-status-bar-style"
+        content="black-translucent"
+    >
+    <meta
+        name="theme-color"
+        content="#000000"
+    >
     <title>DigitalTacho</title>
-    <link rel="stylesheet"
-          href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="diagnostics">
-
-    <div id="gpsStatus">
-        GPS: WARTE
+    <div class="portrait-warning">
+        Bitte das iPhone quer halten.
     </div>
-
-    <div id="gpsAccuracy">
-        Genauigkeit: —
-    </div>
-
-    <div id="gpsLatitude">
-        Lat: —
-    </div>
-
-    <div id="gpsLongitude">
-        Lon: —
-    </div>
-
-    <div id="gpsSpeed">
-        GPS-Speed: —
-    </div>
-
-    <div id="wakeStatus">
-        Wake Lock: AUS
-    </div>
-
-</div>
-<main class="tacho">
-    <!-- =========================
-         GESCHWINDIGKEIT
-         ========================= -->
-    <section class="speed-area">
-        <div id="speed">
-            0
-        </div>
-        <div class="unit">
-            km/h
-        </div>
-    </section>
-    <!-- =========================
-         FAHRDATEN
-         ========================= -->
-    <section class="stats">
-        <div class="stat">
-            <div
-                class="stat-value"
-                id="average">
+    <main class="tacho">
+        <!-- GESCHWINDIGKEIT -->
+        <section class="speed-section">
+            <div id="speed" class="speed">
                 0
             </div>
-            <div class="stat-label">
-                Ø km/h
+            <div class="unit">
+                km/h
             </div>
-        </div>
-        <div class="stat">
-            <div
-                class="stat-value"
-                id="maximum">
-                0
+            <div id="status" class="status">
+                GPS wird gestartet …
             </div>
-            <div class="stat-label">
-                MAX km/h
+        </section>
+        <!-- FAHRTDATEN -->
+        <section class="stats">
+            <div class="stat">
+                <span class="label">
+                    Ø Geschwindigkeit
+                </span>
+                <span id="averageSpeed" class="value">
+                    0.0 km/h
+                </span>
             </div>
-        </div>
-        <div class="stat">
-            <div
-                class="stat-value"
-                id="distance">
-                0.0
+            <div class="stat">
+                <span class="label">
+                    Maximum
+                </span>
+                <span id="maximumSpeed" class="value">
+                    0.0 km/h
+                </span>
             </div>
-            <div class="stat-label">
-                km
+            <div class="stat">
+                <span class="label">
+                    Strecke
+                </span>
+                <span id="distance" class="value">
+                    0.00 km
+                </span>
             </div>
-        </div>
-        <div class="stat">
-            <div
-                class="stat-value"
-                id="duration">
-                00:00
+            <div class="stat">
+                <span class="label">
+                    Fahrzeit
+                </span>
+                <span id="duration" class="value">
+                    00:00:00
+                </span>
             </div>
-            <div class="stat-label">
-                Fahrzeit
-            </div>
-        </div>
-    </section>
-    <!-- =========================
-         RESET
-         ========================= -->
-    <div class="controls">
-
-    <button id="startButton" type="button">
-        START
-    </button>
-
-    <button id="resetButton" type="button">
-        RESET
-    </button>
-
-</div>
-    <!-- =========================
-         GPS STATUS
-         ========================= -->
-    <div id="status">
-        GPS wird gestartet …
-    </div>
-</main>
-<script src="app.js"></script>
+        </section>
+        <!-- BEDIENUNG -->
+        <section class="controls">
+            <button
+                id="startButton"
+                type="button"
+                class="start-button"
+            >
+                START
+            </button>
+            <button
+                id="resetButton"
+                type="button"
+                class="reset-button"
+            >
+                RESET
+            </button>
+        </section>
+    </main>
+    <script src="app.js"></script>
 </body>
 </html>
