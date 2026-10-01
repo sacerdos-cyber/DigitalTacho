@@ -495,16 +495,35 @@ setInterval(
     1000
 );
 function updateTimer() {
-    if (!startTime) {
+
+    /*
+       Timer nur während einer laufenden
+       Fahrt aktualisieren.
+
+       Bei STOP bleibt die zuletzt angezeigte
+       Zeit stehen.
+    */
+
+    if (
+        !startTime ||
+        !isDriving
+    ) {
+
         return;
     }
+
+
     const elapsed =
         Date.now() -
         startTime;
+
+
     durationElement.textContent =
         formatDuration(
             elapsed
         );
+
+
     updateAverageSpeed();
 }
 /* =====================================================
