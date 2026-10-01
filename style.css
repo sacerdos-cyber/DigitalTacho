@@ -154,6 +154,12 @@ body {
 .start-button:active {
     background: #146b2b;
 }
+.stop-button {
+    background: #d32f2f;
+}
+.stop-button:active {
+    background: #a92323;
+}
 .reset-button {
     background: #333;
 }
