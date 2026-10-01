@@ -33,10 +33,86 @@ let startTime = null;
 let speedHistory = [];
 let isDriving = false;
 /* =====================================================
+   WAKE LOCK
+   ===================================================== */
+let wakeLock = null;
+/*
+ * Wake Lock anfordern
+ */
+async function requestWakeLock() {
+    if (
+        !("wakeLock" in navigator)
+    ) {
+        console.log(
+            "Wake Lock wird nicht unterstützt."
+        );
+        return;
+    }
+    try {
+        wakeLock =
+            await navigator.wakeLock.request(
+                "screen"
+            );
+        console.log(
+            "Wake Lock aktiviert."
+        );
+        wakeLock.addEventListener(
+            "release",
+            () => {
+                console.log(
+                    "Wake Lock freigegeben."
+                );
+                wakeLock = null;
+            }
+        );
+    } catch (error) {
+        console.log(
+            "Wake Lock konnte nicht aktiviert werden:",
+            error
+        );
+    }
+}
+/*
+ * Wake Lock freigeben
+ */
+async function releaseWakeLock() {
+    if (
+        wakeLock !== null
+    ) {
+        try {
+            await wakeLock.release();
+        } catch (error) {
+            console.log(
+                "Fehler beim Freigeben des Wake Locks:",
+                error
+            );
+        }
+        wakeLock = null;
+    }
+}
+/*
+ * Wake Lock erneut aktivieren,
+ * wenn Safari wieder aktiv wird.
+ */
+document.addEventListener(
+    "visibilitychange",
+    async () => {
+        if (
+            document.visibilityState ===
+            "visible" &&
+            isDriving
+        ) {
+            await requestWakeLock();
+        }
+    }
+);
+/* =====================================================
    GPS STARTEN
    ===================================================== */
 function startGPS() {
-    if (!navigator.geolocation) {
+    if (
+        !navigator.geolocation
+    ) {
         statusDisplay.textContent =
             "GPS wird nicht unterstützt";
         return;
@@ -47,16 +123,21 @@ function startGPS() {
         gpsUpdate,
         gpsError,
         {
-            enableHighAccuracy: true,
-            maximumAge: 1000,
-            timeout: 15000
+            enableHighAccuracy:
+                true,
+            maximumAge:
+                1000,
+            timeout:
+                15000
         }
     );
 }
 /* =====================================================
    GPS UPDATE
    ===================================================== */
-function gpsUpdate(position) {
+function gpsUpdate(
+    position
+) {
     const coords =
         position.coords;
     const latitude =
@@ -66,11 +147,14 @@ function gpsUpdate(position) {
     const accuracy =
         coords.accuracy;
     /* =================================================
-       GPS-STATUS
+       GPS STATUS
        ================================================= */
     if (
-        !Number.isFinite(accuracy) ||
-        accuracy > MAX_GPS_ACCURACY
+        !Number.isFinite(
+            accuracy
+        ) ||
+        accuracy >
+            MAX_GPS_ACCURACY
     ) {
         statusDisplay.textContent =
             `GPS schwach · ±${Math.round(accuracy)} m`;
@@ -79,17 +163,22 @@ function gpsUpdate(position) {
             `GPS aktiv · ±${Math.round(accuracy)} m`;
     }
     /* =================================================
-       WENN KEINE FAHRT LÄUFT
+       KEINE FAHRT
        ================================================= */
-    if (!isDriving) {
+    if (
+        !isDriving
+    ) {
         return;
     }
     /* =================================================
-       GÜLTIGE GPS-GENAUIGKEIT PRÜFEN
+       GPS GENAUIGKEIT
        ================================================= */
     if (
-        Number.isFinite(accuracy) &&
-        accuracy > MAX_GPS_ACCURACY
+        Number.isFinite(
+            accuracy
+        ) &&
+        accuracy >
+            MAX_GPS_ACCURACY
     ) {
         return;
     }
@@ -98,7 +187,9 @@ function gpsUpdate(position) {
        ================================================= */
     if (
         coords.speed !== null &&
-        Number.isFinite(coords.speed) &&
+        Number.isFinite(
+            coords.speed
+        ) &&
         coords.speed >= 0
     ) {
         let speedKmh =
@@ -121,7 +212,9 @@ function gpsUpdate(position) {
     /* =================================================
        STRECKE
        ================================================= */
-    if (lastPosition !== null) {
+    if (
+        lastPosition !== null
+    ) {
         const distance =
             calculateDistance(
                 lastPosition.latitude,
@@ -133,8 +226,10 @@ function gpsUpdate(position) {
          * GPS-Sprünge ignorieren.
          */
         if (
-            distance >= MIN_DISTANCE_STEP &&
-            distance <= MAX_POSITION_JUMP
+            distance >=
+                MIN_DISTANCE_STEP &&
+            distance <=
+                MAX_POSITION_JUMP
         ) {
             totalDistance +=
                 distance;
@@ -148,9 +243,6 @@ function gpsUpdate(position) {
         longitude:
             longitude
     };
-    /* =================================================
-       DURCHSCHNITT
-       ================================================= */
     updateAverage();
 }
 /* =====================================================
@@ -170,7 +262,10 @@ function addSpeedSample(
     }
     const sum =
         speedHistory.reduce(
-            (total, value) =>
+            (
+                total,
+                value
+            ) =>
                 total + value,
             0
         );
@@ -229,7 +324,7 @@ function updateAverage() {
         );
 }
 /* =====================================================
-   ENTFERNUNG BERECHNEN
+   ENTFERNUNG
    ===================================================== */
 function calculateDistance(
     lat1,
@@ -248,8 +343,12 @@ function calculateDistance(
             lon2 - lon1
         );
     const a =
-        Math.sin(dLat / 2) *
-        Math.sin(dLat / 2)
+        Math.sin(
+            dLat / 2
+        ) *
+        Math.sin(
+            dLat / 2
+        )
         +
         Math.cos(
             toRadians(lat1)
@@ -259,13 +358,19 @@ function calculateDistance(
             toRadians(lat2)
         )
         *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+        Math.sin(
+            dLon / 2
+        ) *
+        Math.sin(
+            dLon / 2
+        );
     const c =
         2 *
         Math.atan2(
             Math.sqrt(a),
-            Math.sqrt(1 - a)
+            Math.sqrt(
+                1 - a
+            )
         );
     return (
         earthRadius *
@@ -340,12 +445,15 @@ function pad(
 /* =====================================================
    START / STOP
    ===================================================== */
-function toggleDriving() {
-    if (!isDriving) {
+async function toggleDriving() {
+    if (
+        !isDriving
+    ) {
         /* =============================
            START
            ============================= */
-        isDriving = true;
+        isDriving =
+            true;
         startTime =
             Date.now();
         lastPosition =
@@ -356,11 +464,16 @@ function toggleDriving() {
             "STOP";
         statusDisplay.textContent =
             "Fahrt läuft";
+        /*
+         * Display wach halten
+         */
+        await requestWakeLock();
     } else {
         /* =============================
            STOP
            ============================= */
-        isDriving = false;
+        isDriving =
+            false;
         speedHistory =
             [];
         speedDisplay.textContent =
@@ -369,6 +482,10 @@ function toggleDriving() {
             "START";
         statusDisplay.textContent =
             "Fahrt beendet";
+        /*
+         * Display wieder freigeben
+         */
+        await releaseWakeLock();
     }
 }
 startButton.addEventListener(
@@ -378,13 +495,19 @@ startButton.addEventListener(
 /* =====================================================
    RESET
    ===================================================== */
-function resetTacho() {
-    isDriving = false;
-    maximumSpeed = 0;
-    totalDistance = 0;
-    lastPosition = null;
-    startTime = null;
-    speedHistory = [];
+async function resetTacho() {
+    isDriving =
+        false;
+    maximumSpeed =
+        0;
+    totalDistance =
+        0;
+    lastPosition =
+        null;
+    startTime =
+        null;
+    speedHistory =
+        [];
     speedDisplay.textContent =
         "0";
     averageDisplay.textContent =
@@ -399,6 +522,7 @@ function resetTacho() {
         "START";
     statusDisplay.textContent =
         "GPS bereit";
+    await releaseWakeLock();
 }
 resetButton.addEventListener(
     "click",
@@ -412,6 +536,6 @@ setInterval(
     1000
 );
 /* =====================================================
-   START
+   GPS STARTEN
    ===================================================== */
 startGPS();
