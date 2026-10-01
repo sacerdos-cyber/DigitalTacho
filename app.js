@@ -12,18 +12,26 @@ const statusDisplay =
     document.getElementById("status");
 const resetButton =
     document.getElementById("resetButton");
-/* =========================
+/* =====================================================
+   EINSTELLUNGEN
+   ===================================================== */
+const MIN_MOVEMENT_SPEED = 1.5;   // km/h
+const MAX_REASONABLE_SPEED = 350; // km/h
+const MAX_GPS_ACCURACY = 50;      // Meter
+const MAX_POSITION_JUMP = 0.5;    // km
+const MIN_DISTANCE_STEP = 0.003;  // 3 Meter
+const SPEED_HISTORY_SIZE = 5;
+/* =====================================================
    FAHRDATEN
-   ========================= */
+   ===================================================== */
 let maximumSpeed = 0;
-let speedSum = 0;
-let speedSamples = 0;
 let totalDistance = 0;
 let lastPosition = null;
 let startTime = null;
-/* =========================
-   GPS
-   ========================= */
+let speedHistory = [];
+/* =====================================================
+   GPS STARTEN
+   ===================================================== */
 function startGPS() {
     if (!navigator.geolocation) {
         statusDisplay.textContent =
@@ -42,9 +50,9 @@ function startGPS() {
         }
     );
 }
-/* =========================
+/* =====================================================
    GPS UPDATE
-   ========================= */
+   ===================================================== */
 function gpsUpdate(position) {
     const coords =
         position.coords;
@@ -52,16 +60,31 @@ function gpsUpdate(position) {
         coords.latitude;
     const longitude =
         coords.longitude;
-    /* =====================
+    const accuracy =
+        coords.accuracy;
+    /* =================================================
+       GPS-GENAUIGKEIT
+       ================================================= */
+    if (
+        !Number.isFinite(accuracy) ||
+        accuracy > MAX_GPS_ACCURACY
+    ) {
+        statusDisplay.textContent =
+            `GPS schwach · ±${Math.round(accuracy)} m`;
+    } else {
+        statusDisplay.textContent =
+            `GPS aktiv · ±${Math.round(accuracy)} m`;
+    }
+    /* =================================================
        FAHRT STARTEN
-       ===================== */
+       ================================================= */
     if (startTime === null) {
         startTime =
             Date.now();
     }
-    /* =====================
+    /* =================================================
        GESCHWINDIGKEIT
-       ===================== */
+       ================================================= */
     if (
         coords.speed !== null &&
         Number.isFinite(coords.speed) &&
@@ -69,35 +92,31 @@ function gpsUpdate(position) {
     ) {
         let speedKmh =
             coords.speed * 3.6;
-        speedKmh =
-            Math.round(speedKmh);
-        if (speedKmh < 1) {
-            speedKmh = 0;
-        }
-        speedDisplay.textContent =
-            speedKmh;
-        /* Maximum */
+        /*
+         * Unplausible Werte ignorieren.
+         */
         if (
-            speedKmh >
-            maximumSpeed
+            speedKmh <=
+            MAX_REASONABLE_SPEED
         ) {
-            maximumSpeed =
-                speedKmh;
-            maximumDisplay.textContent =
-                maximumSpeed;
+            /*
+             * Unter 1,5 km/h
+             * behandeln wir als Stillstand.
+             */
+            if (
+                speedKmh <
+                MIN_MOVEMENT_SPEED
+            ) {
+                speedKmh = 0;
+            }
+            addSpeedSample(
+                speedKmh
+            );
         }
-        /* Durchschnitt */
-        speedSum += speedKmh;
-        speedSamples++;
-        const average =
-            speedSum /
-            speedSamples;
-        averageDisplay.textContent =
-            Math.round(average);
     }
-    /* =====================
+    /* =================================================
        STRECKE
-       ===================== */
+       ================================================= */
     if (lastPosition !== null) {
         const distance =
             calculateDistance(
@@ -107,10 +126,12 @@ function gpsUpdate(position) {
                 longitude
             );
         /*
-         * GPS-Sprünge unter
-         * 3 Metern ignorieren.
+         * GPS-Sprung prüfen.
          */
-        if (distance >= 0.003) {
+        if (
+            distance >= MIN_DISTANCE_STEP &&
+            distance <= MAX_POSITION_JUMP
+        ) {
             totalDistance +=
                 distance;
             distanceDisplay.textContent =
@@ -123,19 +144,96 @@ function gpsUpdate(position) {
         longitude:
             longitude
     };
-    /* =====================
-       GPS STATUS
-       ===================== */
-    const accuracy =
-        Math.round(
-            coords.accuracy
-        );
-    statusDisplay.textContent =
-        `GPS aktiv · ±${accuracy} m`;
+    /* =================================================
+       DURCHSCHNITT
+       ================================================= */
+    updateAverage();
 }
-/* =========================
-   ENTFERNUNG
-   ========================= */
+/* =====================================================
+   GESCHWINDIGKEIT GLÄTTEN
+   ===================================================== */
+function addSpeedSample(
+    speed
+) {
+    speedHistory.push(
+        speed
+    );
+    /*
+     * Nur die letzten
+     * Werte behalten.
+     */
+    if (
+        speedHistory.length >
+        SPEED_HISTORY_SIZE
+    ) {
+        speedHistory.shift();
+    }
+    /*
+     * Durchschnitt der letzten
+     * GPS-Werte.
+     */
+    const sum =
+        speedHistory.reduce(
+            (total, value) =>
+                total + value,
+            0
+        );
+    const average =
+        sum /
+        speedHistory.length;
+    const smoothSpeed =
+        Math.round(
+            average
+        );
+    speedDisplay.textContent =
+        smoothSpeed;
+    /* =================================================
+       MAXIMUM
+       ================================================= */
+    if (
+        smoothSpeed >
+        maximumSpeed
+    ) {
+        maximumSpeed =
+            smoothSpeed;
+        maximumDisplay.textContent =
+            maximumSpeed;
+    }
+}
+/* =====================================================
+   DURCHSCHNITT
+   ===================================================== */
+function updateAverage() {
+    if (
+        startTime === null ||
+        totalDistance <= 0
+    ) {
+        averageDisplay.textContent =
+            "0";
+        return;
+    }
+    const elapsedHours =
+        (
+            Date.now() -
+            startTime
+        ) /
+        3600000;
+    if (
+        elapsedHours <= 0
+    ) {
+        return;
+    }
+    const average =
+        totalDistance /
+        elapsedHours;
+    averageDisplay.textContent =
+        Math.round(
+            average
+        );
+}
+/* =====================================================
+   ENTFERNUNG BERECHNEN
+   ===================================================== */
 function calculateDistance(
     lat1,
     lon1,
@@ -173,7 +271,8 @@ function calculateDistance(
             Math.sqrt(1 - a)
         );
     return (
-        earthRadius * c
+        earthRadius *
+        c
     );
 }
 function toRadians(
@@ -185,11 +284,13 @@ function toRadians(
         180
     );
 }
-/* =========================
+/* =====================================================
    FAHRZEIT
-   ========================= */
+   ===================================================== */
 function updateDuration() {
-    if (startTime === null) {
+    if (
+        startTime === null
+    ) {
         return;
     }
     const elapsed =
@@ -201,16 +302,22 @@ function updateDuration() {
         );
     const hours =
         Math.floor(
-            totalSeconds / 3600
+            totalSeconds /
+            3600
         );
     const minutes =
         Math.floor(
-            (totalSeconds % 3600) /
-            60
+            (
+                totalSeconds %
+                3600
+            ) / 60
         );
     const seconds =
-        totalSeconds % 60;
-    if (hours > 0) {
+        totalSeconds %
+        60;
+    if (
+        hours > 0
+    ) {
         durationDisplay.textContent =
             `${pad(hours)}:` +
             `${pad(minutes)}:` +
@@ -220,16 +327,31 @@ function updateDuration() {
             `${pad(minutes)}:` +
             `${pad(seconds)}`;
     }
+    /*
+     * Durchschnitt regelmäßig
+     * aktualisieren.
+     */
+    updateAverage();
 }
-function pad(number) {
-    return String(number)
-        .padStart(2, "0");
+function pad(
+    number
+) {
+    return String(
+        number
+    ).padStart(
+        2,
+        "0"
+    );
 }
-/* =========================
+/* =====================================================
    GPS FEHLER
-   ========================= */
-function gpsError(error) {
-    switch (error.code) {
+   ===================================================== */
+function gpsError(
+    error
+) {
+    switch (
+        error.code
+    ) {
         case 1:
             statusDisplay.textContent =
                 "Standortzugriff verweigert";
@@ -247,16 +369,16 @@ function gpsError(error) {
                 "GPS Fehler";
     }
 }
-/* =========================
+/* =====================================================
    RESET
-   ========================= */
+   ===================================================== */
 function resetTacho() {
     maximumSpeed = 0;
-    speedSum = 0;
-    speedSamples = 0;
     totalDistance = 0;
     lastPosition = null;
-    startTime = Date.now();
+    startTime =
+        Date.now();
+    speedHistory = [];
     speedDisplay.textContent =
         "0";
     averageDisplay.textContent =
@@ -267,19 +389,21 @@ function resetTacho() {
         "0.0";
     durationDisplay.textContent =
         "00:00";
+    statusDisplay.textContent =
+        "GPS wird gestartet …";
 }
 resetButton.addEventListener(
     "click",
     resetTacho
 );
-/* =========================
-   ZEIT
-   ========================= */
+/* =====================================================
+   TIMER
+   ===================================================== */
 setInterval(
     updateDuration,
     1000
 );
-/* =========================
+/* =====================================================
    START
-   ========================= */
+   ===================================================== */
 startGPS();
