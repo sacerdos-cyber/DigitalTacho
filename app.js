@@ -12,6 +12,8 @@ const statusDisplay =
     document.getElementById("status");
 const resetButton =
     document.getElementById("resetButton");
+const startButton =
+    document.getElementById("startButton");
 /* =====================================================
    EINSTELLUNGEN
    ===================================================== */
@@ -29,6 +31,7 @@ let totalDistance = 0;
 let lastPosition = null;
 let startTime = null;
 let speedHistory = [];
+let isDriving = false;
 /* =====================================================
    GPS STARTEN
    ===================================================== */
@@ -56,6 +59,13 @@ function startGPS() {
 function gpsUpdate(position) {
     const coords =
         position.coords;
+    if (!isDriving) {
+
+    statusDisplay.textContent =
+        `GPS bereit · ±${Math.round(coords.accuracy)} m`;
+
+    return;
+    }
     const latitude =
         coords.latitude;
     const longitude =
