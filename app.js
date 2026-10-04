@@ -110,7 +110,7 @@ const MIN_DISTANCE_STEP = 0.003;
    Geschwindigkeit:
    0.70 = sehr schnelle Reaktion
 */
-const SPEED_SMOOTHING = 0.70;
+const SPEED_SMOOTHING = 0.85;
 /*
    Höhe:
    GPS-Höhe wird stärker geglättet,
