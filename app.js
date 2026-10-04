@@ -180,15 +180,71 @@ function gpsUpdate(position) {
     /* =================================================
        GPS STATUS
        ================================================= */
-    if (
-        accuracy <= MAX_GPS_ACCURACY
-    ) {
-        statusElement.textContent =
-            `GPS AKTIV · ±${Math.round(accuracy)} m`;
-    } else {
-        statusElement.textContent =
-            `GPS SCHWACH · ±${Math.round(accuracy)} m`;
-    }
+    /* =================================================
+       GPS-QUALITÄT
+       ================================================= */
+
+const gpsAccuracy =
+    Math.round(accuracy);
+
+let gpsQuality = "";
+let gpsClass = "";
+
+if (accuracy <= 5) {
+
+    gpsQuality = "SEHR GUT";
+    gpsClass = "gps-excellent";
+
+} else if (accuracy <= 10) {
+
+    gpsQuality = "GUT";
+    gpsClass = "gps-good";
+
+} else if (accuracy <= 20) {
+
+    gpsQuality = "MITTEL";
+    gpsClass = "gps-medium";
+
+} else if (accuracy <= 50) {
+
+    gpsQuality = "SCHWACH";
+    gpsClass = "gps-weak";
+
+} else {
+
+    gpsQuality = "SEHR SCHWACH";
+    gpsClass = "gps-poor";
+}
+
+
+/*
+   Alte GPS-Klasse entfernen
+*/
+
+statusElement.classList.remove(
+    "gps-excellent",
+    "gps-good",
+    "gps-medium",
+    "gps-weak",
+    "gps-poor"
+);
+
+
+/*
+   Neue Klasse setzen
+*/
+
+statusElement.classList.add(
+    gpsClass
+);
+
+
+/*
+   Anzeige
+*/
+
+statusElement.textContent =
+    `● GPS ${gpsQuality} · ±${gpsAccuracy} m`;
     /* =================================================
        ABSOLUTE HÖHE
        ================================================= */
