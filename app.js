@@ -344,7 +344,9 @@ function gpsUpdate(position) {
         displayedSpeed = 0;
     }
     speedElement.textContent =
-        displayedSpeed.toFixed(1);
+    displayedSpeed === 0
+        ? "0"
+        : displayedSpeed.toFixed(1);
     /* =================================================
        MAXIMUM
        ================================================= */
