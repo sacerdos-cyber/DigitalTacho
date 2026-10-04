@@ -117,9 +117,9 @@ body {
 }
 .value {
     font-size: clamp(
-        16px,
-        2vw,
-        24px
+        13px,
+        1.5vw,
+        18px
     );
     font-weight: 600;
     font-variant-numeric:
