@@ -239,3 +239,26 @@ body {
         font-size: 14px;
     }
 }
+/* =====================================================
+   GPS-QUALITÄT
+   ===================================================== */
+
+.gps-excellent {
+    color: #00e676;
+}
+
+.gps-good {
+    color: #66bb6a;
+}
+
+.gps-medium {
+    color: #ffca28;
+}
+
+.gps-weak {
+    color: #ff9800;
+}
+
+.gps-poor {
+    color: #f44336;
+}
