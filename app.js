@@ -107,23 +107,46 @@ let startAltitude = null;
    ===================================================== */
 
 function startGPS() {
-    if (!("geolocation" in navigator)) {
-        statusElement.textContent =
-            "GPS wird von diesem Gerät nicht unterstützt.";
+    if (!window.isSecureContext) {
+        statusElement.textContent = "GPS benötigt eine HTTPS-Verbindung";
         return;
     }
 
-    navigator.geolocation.watchPosition(
-        gpsUpdate,
-        gpsError,
-        {
-            enableHighAccuracy: true,
-            maximumAge: 500,
-            timeout: 20000
-        }
-    );
+    if (!("geolocation" in navigator)) {
+        statusElement.textContent = "GPS wird von diesem Browser nicht unterstützt";
+        return;
+    }
 
-    statusElement.textContent = "GPS wird gestartet …";
+    statusElement.textContent = "GPS wird angefordert …";
+
+    try {
+        navigator.geolocation.watchPosition(
+            gpsUpdate,
+            gpsError,
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 30000
+            }
+        );
+    } catch (error) {
+        console.error("GPS konnte nicht gestartet werden:", error);
+        statusElement.textContent =
+            `GPS-Startfehler: ${error.message}`;
+    }
+}
+
+function gpsError(error) {
+    console.error("GPS-Fehler:", error);
+
+    const messages = {
+        1: "GPS-Zugriff verweigert",
+        2: "GPS-Standort nicht verfügbar",
+        3: "GPS-Zeitüberschreitung"
+    };
+
+    statusElement.textContent =
+        `${messages[error.code] || "GPS-Fehler"}${error.message ? `: ${error.message}` : ""}`;
 }
 
 
