@@ -1,16 +1,4 @@
-/* =====================================================
-   DIGITALTACHO V1.7
-
-   GPS, START / STOP / RESET, Wake Lock
-   Strecke, Fahrzeit, Durchschnitt, Maximum
-   Absolute Höhe und Höhenänderung seit dem ersten START
-   Fahrzeit und Messung laufen nach STOP weiter
-   ===================================================== */
-
-
-/* =====================================================
-   DOM
-   ===================================================== */
+/* DigitalTacho V1.6 – zuletzt bestätigter Funktionsstand */
 
 const speedElement = document.getElementById("speed");
 const averageElement = document.getElementById("averageSpeed");
@@ -21,45 +9,40 @@ const statusElement = document.getElementById("status");
 const startButton = document.getElementById("startButton");
 const resetButton = document.getElementById("resetButton");
 
-
-/* =====================================================
-   HÖHENANZEIGE
-   ===================================================== */
-
 const statsContainer = document.querySelector(".stats");
 
-/* Absolute Höhe */
 let altitudeStat = document.getElementById("altitudeStat");
 
 if (!altitudeStat && statsContainer) {
     altitudeStat = document.createElement("div");
     altitudeStat.id = "altitudeStat";
     altitudeStat.className = "stat";
+
     altitudeStat.innerHTML = `
         <span class="label">Höhe</span>
         <span id="altitude" class="value">— m</span>
     `;
+
     statsContainer.appendChild(altitudeStat);
 }
 
-/* Höhenänderung seit dem ersten START */
-let altitudeChangeStat =
-    document.getElementById("altitudeChangeStat");
+let altitudeChangeStat = document.getElementById("altitudeChangeStat");
 
 if (!altitudeChangeStat && statsContainer) {
     altitudeChangeStat = document.createElement("div");
     altitudeChangeStat.id = "altitudeChangeStat";
     altitudeChangeStat.className = "stat";
+
     altitudeChangeStat.innerHTML = `
         <span class="label">Höhenänderung</span>
         <span id="altitudeChange" class="value">—</span>
     `;
+
     statsContainer.appendChild(altitudeChangeStat);
 }
 
 const altitudeElement = document.getElementById("altitude");
-const altitudeChangeElement =
-    document.getElementById("altitudeChange");
+const altitudeChangeElement = document.getElementById("altitudeChange");
 
 
 /* =====================================================
@@ -68,33 +51,26 @@ const altitudeChangeElement =
 
 const MAX_GPS_ACCURACY = 100;
 const MAX_REASONABLE_SPEED = 350;
-const MAX_POSITION_JUMP = 0.5; // km
-const MIN_DISTANCE_STEP = 0.003; // km
+const MAX_POSITION_JUMP = 0.5;
+const MIN_DISTANCE_STEP = 0.003;
 
-/* 0.70 = schnelle Reaktion, 1.00 = ungefiltert */
 const SPEED_SMOOTHING = 0.70;
-
-/* GPS-Höhe stärker glätten, da sie stärker schwankt */
 const ALTITUDE_SMOOTHING = 0.20;
 
 
 /* =====================================================
-   STATUS UND MESSWERTE
+   VARIABLEN
    ===================================================== */
 
 let maximumSpeed = 0;
 let totalDistance = 0;
-let lastPosition = null;
 
-/*
-   startTime enthält nur den Beginn des aktuell laufenden
-   Abschnitts. Pausenzeit wird dadurch nicht mitgezählt.
-*/
+let lastPosition = null;
 let startTime = null;
-let elapsedBeforeCurrentRun = 0;
 
 let isDriving = false;
 let gpsFixReceived = false;
+
 let wakeLock = null;
 
 let displayedSpeed = 0;
@@ -107,82 +83,79 @@ let startAltitude = null;
    ===================================================== */
 
 function startGPS() {
-    if (!window.isSecureContext) {
-        statusElement.textContent = "GPS benötigt eine HTTPS-Verbindung";
-        return;
-    }
 
     if (!("geolocation" in navigator)) {
-        statusElement.textContent = "GPS wird von diesem Browser nicht unterstützt";
+
+        statusElement.textContent =
+            "GPS wird von diesem Gerät nicht unterstützt.";
+
         return;
     }
 
-    statusElement.textContent = "GPS wird angefordert …";
+    navigator.geolocation.watchPosition(
+        gpsUpdate,
+        gpsError,
+        {
+            enableHighAccuracy: true,
+            maximumAge: 500,
+            timeout: 20000
+        }
+    );
 
-    try {
-        navigator.geolocation.watchPosition(
-            gpsUpdate,
-            gpsError,
-            {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 30000
-            }
-        );
-    } catch (error) {
-        console.error("GPS konnte nicht gestartet werden:", error);
-        statusElement.textContent =
-            `GPS-Startfehler: ${error.message}`;
-    }
-}
-
-function gpsError(error) {
-    console.error("GPS-Fehler:", error);
-
-    const messages = {
-        1: "GPS-Zugriff verweigert",
-        2: "GPS-Standort nicht verfügbar",
-        3: "GPS-Zeitüberschreitung"
-    };
-
-    statusElement.textContent =
-        `${messages[error.code] || "GPS-Fehler"}${error.message ? `: ${error.message}` : ""}`;
+    statusElement.textContent = "GPS wird gestartet …";
 }
 
 
 /* =====================================================
-   GPS UPDATE
+   GPS-DATEN VERARBEITEN
    ===================================================== */
 
 function gpsUpdate(position) {
+
     gpsFixReceived = true;
 
     const coords = position.coords;
+
     const latitude = coords.latitude;
     const longitude = coords.longitude;
     const accuracy = coords.accuracy;
+
     const currentTime = position.timestamp;
 
-    /* GPS-Status */
+
+    /* GPS-STATUS */
+
     if (accuracy <= MAX_GPS_ACCURACY) {
+
         statusElement.textContent =
             `GPS AKTIV · ±${Math.round(accuracy)} m`;
+
     } else {
+
         statusElement.textContent =
             `GPS SCHWACH · ±${Math.round(accuracy)} m`;
     }
 
-    /* Absolute GPS-Höhe glätten und anzeigen */
+
+    /* =================================================
+       HÖHENMESSER
+       ================================================= */
+
     if (
         coords.altitude !== null &&
         Number.isFinite(coords.altitude)
     ) {
+
         const gpsAltitude = coords.altitude;
 
         if (displayedAltitude === null) {
+
             displayedAltitude = gpsAltitude;
+
         } else {
-            displayedAltitude +=
+
+            displayedAltitude =
+                displayedAltitude +
                 (gpsAltitude - displayedAltitude) *
                 ALTITUDE_SMOOTHING;
         }
@@ -190,44 +163,47 @@ function gpsUpdate(position) {
         altitudeElement.textContent =
             `${Math.round(displayedAltitude)} m`;
 
-        /*
-           Beim ersten gültigen Höhenwert während der Fahrt
-           die Referenz setzen, falls beim START noch keine
-           GPS-Höhe vorlag.
-        */
-        if (isDriving && startAltitude === null) {
-            startAltitude = displayedAltitude;
-            altitudeChangeElement.textContent = "0 m";
-        }
 
-        /* Höhenänderung immer zum ersten Fahrtstart berechnen */
-        if (isDriving && startAltitude !== null) {
-            const roundedChange =
-                Math.round(displayedAltitude - startAltitude);
+        /* HÖHENUNTERSCHIED */
 
-            if (roundedChange === 0) {
+        if (
+            isDriving &&
+            startAltitude !== null
+        ) {
+
+            const roundedChange = Math.round(
+                displayedAltitude - startAltitude
+            );
+
+            if (Math.abs(roundedChange) < 1) {
+
                 altitudeChangeElement.textContent = "0 m";
+
             } else if (roundedChange > 0) {
+
                 altitudeChangeElement.textContent =
                     `+${roundedChange} m`;
+
             } else {
+
                 altitudeChangeElement.textContent =
                     `${roundedChange} m`;
             }
         }
     }
 
-    /* Während STOP keine Fahrdaten aufzeichnen */
-    if (!isDriving) {
-        return;
-    }
 
-    /* Ungenaue GPS-Positionen nicht für Fahrtwerte verwenden */
-    if (accuracy > MAX_GPS_ACCURACY) {
-        return;
-    }
+    /* KEINE FAHRT AKTIV */
 
-    /* Geschwindigkeit: GPS-Wert, sonst Positions-Fallback */
+    if (!isDriving) return;
+
+    if (accuracy > MAX_GPS_ACCURACY) return;
+
+
+    /* =================================================
+       GESCHWINDIGKEIT
+       ================================================= */
+
     let currentSpeed = 0;
 
     if (
@@ -235,8 +211,11 @@ function gpsUpdate(position) {
         Number.isFinite(coords.speed) &&
         coords.speed >= 0
     ) {
+
         currentSpeed = coords.speed * 3.6;
+
     } else if (lastPosition) {
+
         const distance = calculateDistance(
             lastPosition.latitude,
             lastPosition.longitude,
@@ -245,39 +224,61 @@ function gpsUpdate(position) {
         );
 
         const timeDifference =
-            (currentTime - lastPosition.timestamp) / 3600000;
+            (currentTime - lastPosition.timestamp) /
+            3600000;
 
         if (
             timeDifference > 0 &&
             distance <= MAX_POSITION_JUMP
         ) {
-            currentSpeed = distance / timeDifference;
+
+            currentSpeed =
+                distance / timeDifference;
         }
     }
 
-    if (currentSpeed > MAX_REASONABLE_SPEED) {
-        return;
-    }
+    if (currentSpeed > MAX_REASONABLE_SPEED) return;
 
-    /* Geschwindigkeit glätten */
-    displayedSpeed +=
-        (currentSpeed - displayedSpeed) * SPEED_SMOOTHING;
+
+    /* GESCHWINDIGKEIT GLÄTTEN */
+
+    displayedSpeed =
+        displayedSpeed +
+        (currentSpeed - displayedSpeed) *
+        SPEED_SMOOTHING;
 
     if (displayedSpeed < 0.5) {
         displayedSpeed = 0;
     }
 
-    speedElement.textContent = displayedSpeed.toFixed(0);
 
-    /* Höchstgeschwindigkeit */
+    /* GESCHWINDIGKEIT ANZEIGEN */
+
+    speedElement.textContent =
+        displayedSpeed === 0
+            ? "0"
+            : displayedSpeed.toFixed(1);
+
+
+    /* =================================================
+       MAXIMALGESCHWINDIGKEIT
+       ================================================= */
+
     if (displayedSpeed > maximumSpeed) {
+
         maximumSpeed = displayedSpeed;
+
         maximumElement.textContent =
             `${maximumSpeed.toFixed(1)} km/h`;
     }
 
-    /* Strecke */
+
+    /* =================================================
+       STRECKE
+       ================================================= */
+
     if (lastPosition) {
+
         const distance = calculateDistance(
             lastPosition.latitude,
             lastPosition.longitude,
@@ -289,8 +290,383 @@ function gpsUpdate(position) {
             distance >= MIN_DISTANCE_STEP &&
             distance <= MAX_POSITION_JUMP
         ) {
+
             totalDistance += distance;
+
             distanceElement.textContent =
                 `${totalDistance.toFixed(2)} km`;
         }
-   
+    }
+
+    lastPosition = {
+        latitude,
+        longitude,
+        timestamp: currentTime
+    };
+
+    updateAverageSpeed();
+}
+
+
+/* =====================================================
+   GPS-FEHLER
+   ===================================================== */
+
+function gpsError(error) {
+
+    switch (error.code) {
+
+        case 1:
+            statusElement.textContent =
+                "GPS-Zugriff verweigert";
+            break;
+
+        case 2:
+            statusElement.textContent =
+                "GPS nicht verfügbar";
+            break;
+
+        case 3:
+            statusElement.textContent =
+                "GPS-Zeitüberschreitung";
+            break;
+
+        default:
+            statusElement.textContent =
+                "GPS-Fehler";
+    }
+}
+
+
+/* =====================================================
+   ENTFERNUNG BERECHNEN
+   HAVERSINE-FORMEL
+   ===================================================== */
+
+function calculateDistance(
+    lat1,
+    lon1,
+    lat2,
+    lon2
+) {
+
+    const earthRadius = 6371;
+
+    const dLat = degreesToRadians(
+        lat2 - lat1
+    );
+
+    const dLon = degreesToRadians(
+        lon2 - lon1
+    );
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(degreesToRadians(lat1)) *
+        Math.cos(degreesToRadians(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+
+    const c =
+        2 * Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1 - a)
+        );
+
+    return earthRadius * c;
+}
+
+
+function degreesToRadians(degrees) {
+
+    return degrees * Math.PI / 180;
+}
+
+
+/* =====================================================
+   DURCHSCHNITTSGESCHWINDIGKEIT
+   ===================================================== */
+
+function updateAverageSpeed() {
+
+    if (
+        !startTime ||
+        totalDistance <= 0
+    ) {
+        return;
+    }
+
+    const elapsedHours =
+        (Date.now() - startTime) /
+        3600000;
+
+    if (elapsedHours <= 0) return;
+
+    const averageSpeed =
+        totalDistance / elapsedHours;
+
+    averageElement.textContent =
+        `${averageSpeed.toFixed(1)} km/h`;
+}
+
+
+/* =====================================================
+   FAHRZEIT
+   ===================================================== */
+
+setInterval(updateTimer, 1000);
+
+
+function updateTimer() {
+
+    if (!startTime || !isDriving) return;
+
+    const elapsed =
+        Date.now() - startTime;
+
+    durationElement.textContent =
+        formatDuration(elapsed);
+
+    updateAverageSpeed();
+}
+
+
+/* =====================================================
+   ZEIT FORMATIEREN
+   ===================================================== */
+
+function formatDuration(milliseconds) {
+
+    const totalSeconds =
+        Math.floor(milliseconds / 1000);
+
+    const hours =
+        Math.floor(totalSeconds / 3600);
+
+    const minutes =
+        Math.floor((totalSeconds % 3600) / 60);
+
+    const seconds =
+        totalSeconds % 60;
+
+    return [
+        hours,
+        minutes,
+        seconds
+    ]
+        .map(value =>
+            String(value).padStart(2, "0")
+        )
+        .join(":");
+}
+
+
+/* =====================================================
+   WAKE LOCK
+   ===================================================== */
+
+async function requestWakeLock() {
+
+    if (!("wakeLock" in navigator)) {
+        return;
+    }
+
+    try {
+
+        wakeLock =
+            await navigator.wakeLock.request(
+                "screen"
+            );
+
+    } catch (error) {
+
+        console.log(
+            "Wake Lock konnte nicht aktiviert werden:",
+            error
+        );
+    }
+}
+
+
+async function releaseWakeLock() {
+
+    if (!wakeLock) return;
+
+    try {
+
+        await wakeLock.release();
+
+    } catch (error) {
+
+        console.log(
+            "Wake Lock konnte nicht freigegeben werden:",
+            error
+        );
+    }
+
+    wakeLock = null;
+}
+
+
+/* =====================================================
+   START / STOP
+   ===================================================== */
+
+startButton.addEventListener(
+    "click",
+    async () => {
+
+        if (!isDriving) {
+
+            /* START */
+
+            isDriving = true;
+
+            startTime = Date.now();
+
+            lastPosition = null;
+            displayedSpeed = 0;
+
+
+            /* STARTHÖHE FESTLEGEN */
+
+            if (displayedAltitude !== null) {
+
+                startAltitude = displayedAltitude;
+
+                altitudeChangeElement.textContent =
+                    "0 m";
+
+            } else {
+
+                startAltitude = null;
+
+                altitudeChangeElement.textContent =
+                    "—";
+            }
+
+
+            statusElement.textContent =
+                "FAHRT LÄUFT";
+
+            startButton.textContent = "STOP";
+
+            startButton.classList.add(
+                "stop-button"
+            );
+
+            await requestWakeLock();
+
+        } else {
+
+            /* STOP */
+
+            isDriving = false;
+
+            displayedSpeed = 0;
+
+            speedElement.textContent = "0";
+
+            statusElement.textContent =
+                "FAHRT BEENDET";
+
+            startButton.textContent = "START";
+
+            startButton.classList.remove(
+                "stop-button"
+            );
+
+            await releaseWakeLock();
+        }
+    }
+);
+
+
+/* =====================================================
+   RESET
+   ===================================================== */
+
+resetButton.addEventListener(
+    "click",
+    async () => {
+
+        isDriving = false;
+
+        maximumSpeed = 0;
+        totalDistance = 0;
+
+        lastPosition = null;
+        startTime = null;
+
+        displayedSpeed = 0;
+        displayedAltitude = null;
+        startAltitude = null;
+
+
+        /* ANZEIGEN ZURÜCKSETZEN */
+
+        speedElement.textContent = "0";
+
+        averageElement.textContent =
+            "0.0 km/h";
+
+        maximumElement.textContent =
+            "0.0 km/h";
+
+        distanceElement.textContent =
+            "0.00 km";
+
+        durationElement.textContent =
+            "00:00:00";
+
+        altitudeElement.textContent =
+            "— m";
+
+        altitudeChangeElement.textContent =
+            "—";
+
+
+        /* GPS-STATUS */
+
+        statusElement.textContent =
+            gpsFixReceived
+                ? "GPS AKTIV"
+                : "GPS wird gestartet …";
+
+
+        /* START-BUTTON */
+
+        startButton.textContent = "START";
+
+        startButton.classList.remove(
+            "stop-button"
+        );
+
+        await releaseWakeLock();
+    }
+);
+
+
+/* =====================================================
+   WAKE LOCK BEI SICHTBARKEIT ERNEUERN
+   ===================================================== */
+
+document.addEventListener(
+    "visibilitychange",
+    async () => {
+
+        if (
+            document.visibilityState === "visible" &&
+            isDriving
+        ) {
+
+            await requestWakeLock();
+        }
+    }
+);
+
+
+/* =====================================================
+   GPS INITIALISIEREN
+   ===================================================== */
+
+startGPS();
