@@ -2,44 +2,105 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     >
+
     <meta
         name="apple-mobile-web-app-capable"
         content="yes"
     >
+
     <meta
         name="apple-mobile-web-app-status-bar-style"
         content="black-translucent"
     >
+
     <meta
         name="theme-color"
         content="#000000"
     >
+
     <title>DigitalTacho</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+
     <div class="portrait-warning">
         Bitte das iPhone quer halten.
     </div>
+
     <main class="tacho">
-        <!-- GESCHWINDIGKEIT -->
+
+        <!-- GESCHWINDIGKEIT UND SCHRÄGLAGE -->
+
         <section class="speed-section">
-            <div id="speed" class="speed">
-                0
+
+            <div class="speed-layout">
+
+                <!-- LINKS -->
+
+                <div class="lean-indicator lean-left">
+
+                    <span class="lean-label">
+                        LINKS
+                    </span>
+
+                    <span id="leanLeft" class="lean-value">
+                        0°
+                    </span>
+
+                </div>
+
+                <!-- GESCHWINDIGKEIT -->
+
+                <div class="speed-center">
+
+                    <div id="speed" class="speed">
+                        0
+                    </div>
+
+                    <div class="unit">
+                        km/h
+                    </div>
+
+                </div>
+
+                <!-- RECHTS -->
+
+                <div class="lean-indicator lean-right">
+
+                    <span class="lean-label">
+                        RECHTS
+                    </span>
+
+                    <span id="leanRight" class="lean-value">
+                        0°
+                    </span>
+
+                </div>
+
             </div>
-            <div class="unit">
-                km/h
-            </div>
+
             <div id="status" class="status">
                 GPS wird gestartet …
             </div>
+
+            <div id="leanStatus" class="lean-status">
+                Neigungssensor nicht aktiviert
+            </div>
+
         </section>
+
+
         <!-- FAHRTDATEN -->
+
         <section class="stats">
+
             <div class="stat">
                 <span class="label">
                     Ø Geschwindigkeit
@@ -48,6 +109,7 @@
                     0.0 km/h
                 </span>
             </div>
+
             <div class="stat">
                 <span class="label">
                     Maximum
@@ -56,6 +118,7 @@
                     0.0 km/h
                 </span>
             </div>
+
             <div class="stat">
                 <span class="label">
                     Strecke
@@ -64,6 +127,7 @@
                     0.00 km
                 </span>
             </div>
+
             <div class="stat">
                 <span class="label">
                     Fahrzeit
@@ -72,9 +136,14 @@
                     00:00:00
                 </span>
             </div>
+
         </section>
+
+
         <!-- BEDIENUNG -->
+
         <section class="controls">
+
             <button
                 id="startButton"
                 type="button"
@@ -82,6 +151,7 @@
             >
                 START
             </button>
+
             <button
                 id="resetButton"
                 type="button"
@@ -89,8 +159,20 @@
             >
                 RESET
             </button>
+
+            <button
+                id="zeroButton"
+                type="button"
+                class="zero-button"
+            >
+                ZERO
+            </button>
+
         </section>
+
     </main>
+
     <script src="app.js"></script>
+
 </body>
 </html>
