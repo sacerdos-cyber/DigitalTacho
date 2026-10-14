@@ -1,6 +1,6 @@
 /* =====================================================
-   DIGITALTACHO V1.6
-   MIT EXPERIMENTELLER SCHRÄGLAGENANZEIGE
+   DIGITALTACHO
+   GPS + SCHRÄGLAGE + LÄNGSNEIGUNG
    ===================================================== */
 
 
@@ -9,90 +9,62 @@
    ===================================================== */
 
 const speedElement = document.getElementById("speed");
+const averageElement = document.getElementById("averageSpeed");
+const maximumElement = document.getElementById("maximumSpeed");
+const distanceElement = document.getElementById("distance");
+const durationElement = document.getElementById("duration");
+const statusElement = document.getElementById("status");
 
-const averageElement =
-    document.getElementById("averageSpeed");
+const startButton = document.getElementById("startButton");
+const resetButton = document.getElementById("resetButton");
+const zeroButton = document.getElementById("zeroButton");
 
-const maximumElement =
-    document.getElementById("maximumSpeed");
+const leanLeftElement = document.getElementById("leanLeft");
+const leanRightElement = document.getElementById("leanRight");
+const leanStatusElement = document.getElementById("leanStatus");
 
-const distanceElement =
-    document.getElementById("distance");
+const pitchValueElement = document.getElementById("pitchValue");
+const pitchDirectionElement = document.getElementById("pitchDirection");
 
-const durationElement =
-    document.getElementById("duration");
-
-const statusElement =
-    document.getElementById("status");
-
-const startButton =
-    document.getElementById("startButton");
-
-const resetButton =
-    document.getElementById("resetButton");
-
-const zeroButton =
-    document.getElementById("zeroButton");
-
-const leanLeftElement =
-    document.getElementById("leanLeft");
-
-const leanRightElement =
-    document.getElementById("leanRight");
-
-const leanStatusElement =
-    document.getElementById("leanStatus");
-
-const statsContainer =
-    document.querySelector(".stats");
+const statsContainer = document.querySelector(".stats");
 
 
 /* =====================================================
-   HÖHENANZEIGEN
+   HÖHENANZEIGEN ERSTELLEN
    ===================================================== */
 
-let altitudeStat =
-    document.getElementById("altitudeStat");
+if (!document.getElementById("altitudeStat")) {
 
-if (!altitudeStat && statsContainer) {
+    const element = document.createElement("div");
 
-    altitudeStat = document.createElement("div");
+    element.id = "altitudeStat";
+    element.className = "stat";
 
-    altitudeStat.id = "altitudeStat";
-    altitudeStat.className = "stat";
-
-    altitudeStat.innerHTML = `
+    element.innerHTML = `
         <span class="label">Höhe</span>
         <span id="altitude" class="value">— m</span>
     `;
 
-    statsContainer.appendChild(altitudeStat);
+    statsContainer.appendChild(element);
 }
 
-let altitudeChangeStat =
-    document.getElementById("altitudeChangeStat");
+if (!document.getElementById("altitudeChangeStat")) {
 
-if (!altitudeChangeStat && statsContainer) {
+    const element = document.createElement("div");
 
-    altitudeChangeStat =
-        document.createElement("div");
+    element.id = "altitudeChangeStat";
+    element.className = "stat";
 
-    altitudeChangeStat.id = "altitudeChangeStat";
-    altitudeChangeStat.className = "stat";
-
-    altitudeChangeStat.innerHTML = `
+    element.innerHTML = `
         <span class="label">Höhenänderung</span>
         <span id="altitudeChange" class="value">—</span>
     `;
 
-    statsContainer.appendChild(altitudeChangeStat);
+    statsContainer.appendChild(element);
 }
 
-const altitudeElement =
-    document.getElementById("altitude");
-
-const altitudeChangeElement =
-    document.getElementById("altitudeChange");
+const altitudeElement = document.getElementById("altitude");
+const altitudeChangeElement = document.getElementById("altitudeChange");
 
 
 /* =====================================================
@@ -107,6 +79,9 @@ const MIN_DISTANCE_STEP = 0.003;
 
 const SPEED_SMOOTHING = 0.70;
 const ALTITUDE_SMOOTHING = 0.20;
+
+const TILT_SMOOTHING = 0.25;
+const PITCH_SMOOTHING = 0.20;
 
 
 /* =====================================================
@@ -127,6 +102,30 @@ let wakeLock = null;
 let displayedSpeed = 0;
 let displayedAltitude = null;
 let startAltitude = null;
+
+
+/* =====================================================
+   SCHRÄGLAGE
+   ===================================================== */
+
+let sensorActive = false;
+let sensorReceived = false;
+
+let currentTilt = null;
+let zeroTilt = null;
+let displayedTilt = 0;
+
+let maxLeanLeft = 0;
+let maxLeanRight = 0;
+
+
+/* =====================================================
+   LÄNGSNEIGUNG
+   ===================================================== */
+
+let currentPitch = null;
+let zeroPitch = null;
+let displayedPitch = 0;
 
 
 /* =====================================================
@@ -215,6 +214,8 @@ function gpsUpdate(position) {
             `${Math.round(displayedAltitude)} m`;
 
 
+        /* HÖHENUNTERSCHIED */
+
         if (
             isDriving &&
             startAltitude !== null
@@ -224,16 +225,10 @@ function gpsUpdate(position) {
                 displayedAltitude - startAltitude
             );
 
-            if (change > 0) {
-
-                altitudeChangeElement.textContent =
-                    `+${change} m`;
-
-            } else {
-
-                altitudeChangeElement.textContent =
-                    `${change} m`;
-            }
+            altitudeChangeElement.textContent =
+                change > 0
+                    ? `+${change} m`
+                    : `${change} m`;
         }
     }
 
@@ -287,7 +282,7 @@ function gpsUpdate(position) {
     }
 
 
-    /* GLÄTTUNG */
+    /* GESCHWINDIGKEIT GLÄTTEN */
 
     displayedSpeed +=
         (currentSpeed - displayedSpeed) *
@@ -303,7 +298,7 @@ function gpsUpdate(position) {
             : displayedSpeed.toFixed(1);
 
 
-    /* MAXIMUM */
+    /* MAXIMALGESCHWINDIGKEIT */
 
     if (displayedSpeed > maximumSpeed) {
 
@@ -348,7 +343,7 @@ function gpsUpdate(position) {
 
 
 /* =====================================================
-   GPS FEHLER
+   GPS-FEHLER
    ===================================================== */
 
 function gpsError(error) {
@@ -378,15 +373,10 @@ function gpsError(error) {
 
 
 /* =====================================================
-   HAVERSINE
+   ENTFERNUNG BERECHNEN
    ===================================================== */
 
-function calculateDistance(
-    lat1,
-    lon1,
-    lat2,
-    lon2
-) {
+function calculateDistance(lat1, lon1, lat2, lon2) {
 
     const earthRadius = 6371;
 
@@ -414,7 +404,7 @@ function degreesToRadians(degrees) {
 
 
 /* =====================================================
-   DURCHSCHNITT
+   DURCHSCHNITTSGESCHWINDIGKEIT
    ===================================================== */
 
 function updateAverageSpeed() {
@@ -446,8 +436,7 @@ function updateTimer() {
 
     if (!startTime || !isDriving) return;
 
-    const elapsed =
-        Date.now() - startTime;
+    const elapsed = Date.now() - startTime;
 
     durationElement.textContent =
         formatDuration(elapsed);
@@ -523,121 +512,121 @@ async function releaseWakeLock() {
    START / STOP
    ===================================================== */
 
-startButton.addEventListener(
-    "click",
-    async () => {
+startButton.addEventListener("click", async () => {
 
-        if (!isDriving) {
+    if (!isDriving) {
 
-            isDriving = true;
+        /* START */
 
-            startTime = Date.now();
+        isDriving = true;
 
-            lastPosition = null;
-            displayedSpeed = 0;
+        startTime = Date.now();
 
-            if (displayedAltitude !== null) {
+        lastPosition = null;
+        displayedSpeed = 0;
 
-                startAltitude = displayedAltitude;
+        if (displayedAltitude !== null) {
 
-                altitudeChangeElement.textContent =
-                    "0 m";
+            startAltitude = displayedAltitude;
 
-            } else {
-
-                startAltitude = null;
-
-                altitudeChangeElement.textContent =
-                    "—";
-            }
-
-            statusElement.textContent =
-                "FAHRT LÄUFT";
-
-            startButton.textContent = "STOP";
-
-            startButton.classList.add(
-                "stop-button"
-            );
-
-            await requestWakeLock();
+            altitudeChangeElement.textContent =
+                "0 m";
 
         } else {
 
-            isDriving = false;
-            displayedSpeed = 0;
+            startAltitude = null;
 
-            speedElement.textContent = "0";
-
-            statusElement.textContent =
-                "FAHRT BEENDET";
-
-            startButton.textContent = "START";
-
-            startButton.classList.remove(
-                "stop-button"
-            );
-
-            await releaseWakeLock();
+            altitudeChangeElement.textContent =
+                "—";
         }
+
+        statusElement.textContent =
+            "FAHRT LÄUFT";
+
+        startButton.textContent = "STOP";
+
+        startButton.classList.add("stop-button");
+
+        await requestWakeLock();
+
+    } else {
+
+        /* STOP */
+
+        isDriving = false;
+        displayedSpeed = 0;
+
+        speedElement.textContent = "0";
+
+        statusElement.textContent =
+            "FAHRT BEENDET";
+
+        startButton.textContent = "START";
+
+        startButton.classList.remove("stop-button");
+
+        await releaseWakeLock();
     }
-);
+});
 
 
 /* =====================================================
    RESET
    ===================================================== */
 
-resetButton.addEventListener(
-    "click",
-    async () => {
+resetButton.addEventListener("click", async () => {
 
-        isDriving = false;
+    isDriving = false;
 
-        maximumSpeed = 0;
-        totalDistance = 0;
+    maximumSpeed = 0;
+    totalDistance = 0;
 
-        lastPosition = null;
-        startTime = null;
+    lastPosition = null;
+    startTime = null;
 
-        displayedSpeed = 0;
-        displayedAltitude = null;
-        startAltitude = null;
+    displayedSpeed = 0;
+    displayedAltitude = null;
+    startAltitude = null;
 
-        speedElement.textContent = "0";
 
-        averageElement.textContent =
-            "0.0 km/h";
+    /* SCHRÄGLAGEN-HÖCHSTWERTE LÖSCHEN */
 
-        maximumElement.textContent =
-            "0.0 km/h";
+    maxLeanLeft = 0;
+    maxLeanRight = 0;
 
-        distanceElement.textContent =
-            "0.00 km";
+    leanLeftElement.textContent = "0° (0°)";
+    leanRightElement.textContent = "0° (0°)";
 
-        durationElement.textContent =
-            "00:00:00";
 
-        altitudeElement.textContent =
-            "— m";
+    /* FAHRTDATEN ZURÜCKSETZEN */
 
-        altitudeChangeElement.textContent =
-            "—";
+    speedElement.textContent = "0";
 
-        statusElement.textContent =
-            gpsFixReceived
-                ? "GPS AKTIV"
-                : "GPS wird gestartet …";
+    averageElement.textContent = "0.0 km/h";
+    maximumElement.textContent = "0.0 km/h";
 
-        startButton.textContent = "START";
+    distanceElement.textContent = "0.00 km";
+    durationElement.textContent = "00:00:00";
 
-        startButton.classList.remove(
-            "stop-button"
-        );
+    altitudeElement.textContent = "— m";
+    altitudeChangeElement.textContent = "—";
 
-        await releaseWakeLock();
-    }
-);
+
+    /* GPS-STATUS */
+
+    statusElement.textContent =
+        gpsFixReceived
+            ? "GPS AKTIV"
+            : "GPS wird gestartet …";
+
+
+    /* BUTTON */
+
+    startButton.textContent = "START";
+    startButton.classList.remove("stop-button");
+
+    await releaseWakeLock();
+});
 
 
 /* =====================================================
@@ -657,34 +646,6 @@ document.addEventListener(
         }
     }
 );
-
-
-/* =====================================================
-   EXPERIMENTELLE NEIGUNGSMESSUNG
-   ===================================================== */
-
-/*
-   Montage:
-   iPhone im Querformat, nahezu senkrecht,
-   Display zum Fahrer.
-
-   Die Beta-Achse wird als Ausgangspunkt
-   für die Neigungsmessung verwendet.
-
-   Achtung:
-   Kein verlässlicher Motorrad-
-   Schräglagenmesser während Kurvenfahrt.
-*/
-
-let sensorActive = false;
-let sensorReceived = false;
-
-let currentTilt = null;
-let zeroTilt = null;
-
-let displayedTilt = 0;
-
-const TILT_SMOOTHING = 0.25;
 
 
 /* =====================================================
@@ -720,29 +681,16 @@ function angleDifference(a, b) {
 
 
 /* =====================================================
-   SENSORWERTE
+   SCHRÄGLAGE UND LÄNGSNEIGUNG
    ===================================================== */
 
 function updateTilt(event) {
 
-    if (
-        event.beta === null ||
-        !Number.isFinite(event.beta)
-    ) {
-
+    if (!Number.isFinite(event.beta)) {
         return;
     }
 
     sensorReceived = true;
-
-    /*
-       Querformat:
-       Beta als experimenteller
-       Neigungsindikator.
-
-       Bei 270° Bildschirmdrehung
-       wird die Richtung umgekehrt.
-    */
 
     const screenAngle = getScreenAngle();
 
@@ -752,10 +700,25 @@ function updateTilt(event) {
             ? -1
             : 1;
 
+
+    /* =================================================
+       SCHRÄGLAGE ERFASSEN
+       ================================================= */
+
     currentTilt = event.beta * direction;
 
 
-    /* AUF KALIBRIERUNG WARTEN */
+    /* =================================================
+       LÄNGSNEIGUNG ERFASSEN
+       ================================================= */
+
+    if (Number.isFinite(event.gamma)) {
+
+        currentPitch = event.gamma * direction;
+    }
+
+
+    /* AUF ZERO-KALIBRIERUNG WARTEN */
 
     if (zeroTilt === null) {
 
@@ -766,50 +729,102 @@ function updateTilt(event) {
     }
 
 
-    /* RELATIVER NEIGUNGSWINKEL */
+    /* =================================================
+       SCHRÄGLAGE BERECHNEN
+       ================================================= */
 
     const relativeTilt =
         angleDifference(currentTilt, zeroTilt);
-
-
-    /* GLÄTTUNG */
 
     displayedTilt +=
         (relativeTilt - displayedTilt) *
         TILT_SMOOTHING;
 
-
-    /* ANZEIGE */
-
     const tilt = Math.round(displayedTilt);
 
-    if (Math.abs(tilt) < 1) {
+    const currentLeft = Math.max(0, -tilt);
+    const currentRight = Math.max(0, tilt);
 
-        leanLeftElement.textContent = "0°";
-        leanRightElement.textContent = "0°";
 
-        return;
+    /* =================================================
+       SCHRÄGLAGEN-HÖCHSTWERTE
+       NUR WÄHREND AKTIVER FAHRT
+       ================================================= */
+
+    if (isDriving) {
+
+        maxLeanLeft = Math.max(
+            maxLeanLeft,
+            currentLeft
+        );
+
+        maxLeanRight = Math.max(
+            maxLeanRight,
+            currentRight
+        );
     }
 
-    if (tilt < 0) {
 
-        leanLeftElement.textContent =
-            `${Math.abs(tilt)}°`;
+    /* AKTUELLE WERTE UND MAXIMA */
 
-        leanRightElement.textContent = "0°";
+    leanLeftElement.textContent =
+        `${currentLeft}° (${maxLeanLeft}°)`;
 
-    } else {
+    leanRightElement.textContent =
+        `${currentRight}° (${maxLeanRight}°)`;
 
-        leanLeftElement.textContent = "0°";
 
-        leanRightElement.textContent =
-            `${tilt}°`;
+    /* =================================================
+       LÄNGSNEIGUNG BERECHNEN
+       ================================================= */
+
+    if (
+        currentPitch !== null &&
+        zeroPitch !== null
+    ) {
+
+        const pitch =
+            angleDifference(currentPitch, zeroPitch);
+
+        displayedPitch +=
+            (pitch - displayedPitch) *
+            PITCH_SMOOTHING;
+
+        const degrees =
+            Math.abs(displayedPitch) < 0.5
+                ? 0
+                : displayedPitch;
+
+
+        /* GRADZAHL */
+
+        pitchValueElement.textContent =
+            `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
+
+
+        /* RICHTUNG */
+
+        if (degrees > 0.5) {
+
+            pitchDirectionElement.textContent =
+                "BERGAUF";
+
+        } else if (degrees < -0.5) {
+
+            pitchDirectionElement.textContent =
+                "BERGAB";
+
+        } else {
+
+            pitchDirectionElement.textContent =
+                "EBEN";
+        }
     }
 }
 
 
 /* =====================================================
-   SENSOR AKTIVIEREN
+   NEIGUNGSSENSOR AKTIVIEREN
    ===================================================== */
 
 async function activateTiltSensor() {
@@ -824,11 +839,7 @@ async function activateTiltSensor() {
 
     try {
 
-        /*
-           iOS verlangt gegebenenfalls
-           eine ausdrückliche Freigabe
-           nach einem Tastendruck.
-        */
+        /* IOS-BERECHTIGUNG */
 
         if (
             typeof DeviceOrientationEvent.requestPermission
@@ -846,6 +857,9 @@ async function activateTiltSensor() {
                 return false;
             }
         }
+
+
+        /* SENSOR STARTEN */
 
         if (!sensorActive) {
 
@@ -881,45 +895,79 @@ async function activateTiltSensor() {
    ZERO-KALIBRIERUNG
    ===================================================== */
 
-zeroButton.addEventListener(
-    "click",
-    async () => {
+zeroButton.addEventListener("click", async () => {
 
-        if (!sensorActive) {
+    if (!sensorActive) {
 
-            const activated =
-                await activateTiltSensor();
+        const activated =
+            await activateTiltSensor();
 
-            if (!activated) return;
-        }
+        if (!activated) return;
+    }
 
-        /*
-           Die Kalibrierung erfolgt erst,
-           wenn tatsächlich ein gültiger
-           Sensorwert eingetroffen ist.
-        */
 
-        if (
-            !sensorReceived ||
-            currentTilt === null
-        ) {
+    /* AUF SENSORWERTE WARTEN */
 
-            leanStatusElement.textContent =
-                "Sensor startet – ZERO erneut drücken";
-
-            return;
-        }
-
-        zeroTilt = currentTilt;
-        displayedTilt = 0;
-
-        leanLeftElement.textContent = "0°";
-        leanRightElement.textContent = "0°";
+    if (
+        !sensorReceived ||
+        currentTilt === null
+    ) {
 
         leanStatusElement.textContent =
-            "Neigung kalibriert · experimentell";
+            "Sensor startet – ZERO erneut drücken";
+
+        return;
     }
-);
+
+
+    /* =================================================
+       QUERNEIGUNG KALIBRIEREN
+       ================================================= */
+
+    zeroTilt = currentTilt;
+    displayedTilt = 0;
+
+
+    /* =================================================
+       LÄNGSNEIGUNG KALIBRIEREN
+       ================================================= */
+
+    zeroPitch = currentPitch;
+    displayedPitch = 0;
+
+
+    /* SCHRÄGLAGENANZEIGE */
+
+    leanLeftElement.textContent =
+        `0° (${maxLeanLeft}°)`;
+
+    leanRightElement.textContent =
+        `0° (${maxLeanRight}°)`;
+
+
+    /* LÄNGSNEIGUNGSANZEIGE */
+
+    if (zeroPitch !== null) {
+
+        pitchValueElement.textContent = "0.0°";
+
+        pitchDirectionElement.textContent =
+            "EBEN";
+
+    } else {
+
+        pitchValueElement.textContent = "—";
+
+        pitchDirectionElement.textContent =
+            "SENSOR NICHT VERFÜGBAR";
+    }
+
+
+    /* STATUS */
+
+    leanStatusElement.textContent =
+        "Neigung kalibriert · experimentell";
+});
 
 
 /* =====================================================
